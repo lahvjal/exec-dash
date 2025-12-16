@@ -1,5 +1,7 @@
 import { query, queryOne } from './db';
 import { TimePeriod, KPIValue, KPITrend, KPIStatus } from '@/types/kpi';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 /**
  * KPI Service Layer
@@ -148,47 +150,83 @@ function calculateStatus(value: number, goal?: number): KPIStatus {
 }
 
 // =============================================================================
-// HARDCODED GOALS (to be moved to database later)
+// GOALS MANAGEMENT
 // =============================================================================
 
-const GOALS = {
-  total_sales: {
-    current_week: 50,
-    previous_week: 50,
-    mtd: 200,
-    ytd: 2400,
-  },
-  installs_complete: {
-    current_week: 40,
-    previous_week: 40,
-    mtd: 160,
-    ytd: 1920,
-  },
-  avg_days_pp_to_install: {
-    current_week: 60,
-    previous_week: 60,
-    mtd: 60,
-  },
-  avg_days_install_to_m2: {
-    previous_week: 30,
-    ytd: 30,
-  },
-  avg_days_pp_to_pto: {
-    previous_week: 90,
-    mtd: 90,
-    ytd: 90,
-  },
-  total_kw_scheduled: {
-    current_week: 500,
-    next_week: 500,
-  },
-  total_kw_installed: {
-    current_week: 400,
-    previous_week: 400,
-    mtd: 1600,
-    ytd: 19200,
-  },
-};
+const GOALS_FILE_PATH = path.join(process.cwd(), 'data', 'goals.json');
+
+// Cache goals in memory to avoid file reads on every request
+let goalsCache: any = null;
+let goalsCacheTime: number = 0;
+const GOALS_CACHE_TTL = 60000; // 1 minute
+
+/**
+ * Load goals from JSON file with caching
+ */
+async function loadGoals(): Promise<any> {
+  const now = Date.now();
+  
+  // Return cached goals if still valid
+  if (goalsCache && (now - goalsCacheTime) < GOALS_CACHE_TTL) {
+    return goalsCache;
+  }
+  
+  try {
+    const fileContent = await fs.readFile(GOALS_FILE_PATH, 'utf-8');
+    goalsCache = JSON.parse(fileContent);
+    goalsCacheTime = now;
+    return goalsCache;
+  } catch (error) {
+    console.error('Error loading goals:', error);
+    // Return default goals as fallback
+    return {
+      total_sales: {
+        current_week: 50,
+        previous_week: 50,
+        mtd: 200,
+        ytd: 2400,
+      },
+      installs_complete: {
+        current_week: 40,
+        previous_week: 40,
+        mtd: 160,
+        ytd: 1920,
+      },
+      avg_days_pp_to_install: {
+        current_week: 60,
+        previous_week: 60,
+        mtd: 60,
+      },
+      avg_days_install_to_m2: {
+        previous_week: 30,
+        ytd: 30,
+      },
+      avg_days_pp_to_pto: {
+        previous_week: 90,
+        mtd: 90,
+        ytd: 90,
+      },
+      total_kw_scheduled: {
+        current_week: 500,
+        next_week: 500,
+      },
+      total_kw_installed: {
+        current_week: 400,
+        previous_week: 400,
+        mtd: 1600,
+        ytd: 19200,
+      },
+    };
+  }
+}
+
+/**
+ * Get goal for a specific KPI and period
+ */
+async function getGoal(kpiId: string, period: TimePeriod): Promise<number | undefined> {
+  const goals = await loadGoals();
+  return goals[kpiId]?.[period];
+}
 
 // =============================================================================
 // SALES & APPROVAL PIPELINE
@@ -216,7 +254,7 @@ export async function getTotalSales(period: TimePeriod): Promise<KPIValue> {
   const prevResult = await queryOne<{ count: number }>(prevSql);
   const prevValue = prevResult?.count || 0;
   
-  const goal = GOALS.total_sales[period as keyof typeof GOALS.total_sales];
+  const goal = await getGoal('total_sales', period);
   const trend = calculateTrend(value, prevValue);
   
   return {
@@ -232,7 +270,7 @@ export async function getTotalSales(period: TimePeriod): Promise<KPIValue> {
 }
 
 export async function getTotalSalesGoal(period: TimePeriod): Promise<KPIValue> {
-  const goal = GOALS.total_sales[period as keyof typeof GOALS.total_sales] || 0;
+  const goal = await getGoal('total_sales', period) || 0;
   
   return {
     value: goal,
@@ -311,7 +349,7 @@ export async function getInstallsComplete(period: TimePeriod): Promise<KPIValue>
   const result = await queryOne<{ count: number }>(sql);
   const value = result?.count || 0;
   
-  const goal = GOALS.installs_complete[period as keyof typeof GOALS.installs_complete];
+  const goal = await getGoal('installs_complete', period);
   
   return {
     value,
@@ -324,7 +362,7 @@ export async function getInstallsComplete(period: TimePeriod): Promise<KPIValue>
 }
 
 export async function getInstallCompletionGoal(period: TimePeriod): Promise<KPIValue> {
-  const goal = GOALS.installs_complete[period as keyof typeof GOALS.installs_complete] || 0;
+  const goal = await getGoal('installs_complete', period) || 0;
   
   return {
     value: goal,
@@ -393,7 +431,7 @@ export async function getAvgDaysPPToInstall(period: TimePeriod): Promise<KPIValu
   const result = await queryOne<{ avg_days: number }>(sql);
   const value = result?.avg_days || 0;
   
-  const goal = GOALS.avg_days_pp_to_install[period as keyof typeof GOALS.avg_days_pp_to_install];
+  const goal = await getGoal('avg_days_pp_to_install', period);
   
   return {
     value,
@@ -419,7 +457,7 @@ export async function getAvgDaysInstallToM2(period: TimePeriod): Promise<KPIValu
   const result = await queryOne<{ avg_days: number }>(sql);
   const value = result?.avg_days || 0;
   
-  const goal = GOALS.avg_days_install_to_m2[period as keyof typeof GOALS.avg_days_install_to_m2];
+  const goal = await getGoal('avg_days_install_to_m2', period);
   
   return {
     value,
@@ -444,7 +482,7 @@ export async function getAvgDaysPPToPTO(period: TimePeriod): Promise<KPIValue> {
   const result = await queryOne<{ avg_days: number }>(sql);
   const value = result?.avg_days || 0;
   
-  const goal = GOALS.avg_days_pp_to_pto[period as keyof typeof GOALS.avg_days_pp_to_pto];
+  const goal = await getGoal('avg_days_pp_to_pto', period);
   
   return {
     value,
@@ -584,7 +622,7 @@ export async function getTotalKWScheduled(period: TimePeriod): Promise<KPIValue>
   const result = await queryOne<{ total_kw: number }>(sql);
   const value = result?.total_kw || 0;
   
-  const goal = GOALS.total_kw_scheduled[period as keyof typeof GOALS.total_kw_scheduled];
+  const goal = await getGoal('total_kw_scheduled', period);
   
   return {
     value,
@@ -597,7 +635,7 @@ export async function getTotalKWScheduled(period: TimePeriod): Promise<KPIValue>
 }
 
 export async function getKWScheduledGoal(period: TimePeriod): Promise<KPIValue> {
-  const goal = GOALS.total_kw_scheduled[period as keyof typeof GOALS.total_kw_scheduled] || 0;
+  const goal = await getGoal('total_kw_scheduled', period) || 0;
   
   return {
     value: goal,
@@ -620,7 +658,7 @@ export async function getTotalKWInstalled(period: TimePeriod): Promise<KPIValue>
   const result = await queryOne<{ total_kw: number }>(sql);
   const value = result?.total_kw || 0;
   
-  const goal = GOALS.total_kw_installed[period as keyof typeof GOALS.total_kw_installed];
+  const goal = await getGoal('total_kw_installed', period);
   
   return {
     value,
@@ -633,7 +671,7 @@ export async function getTotalKWInstalled(period: TimePeriod): Promise<KPIValue>
 }
 
 export async function getKWInstalledGoal(period: TimePeriod): Promise<KPIValue> {
-  const goal = GOALS.total_kw_installed[period as keyof typeof GOALS.total_kw_installed] || 0;
+  const goal = await getGoal('total_kw_installed', period) || 0;
   
   return {
     value: goal,
