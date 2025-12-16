@@ -71,14 +71,18 @@ export default function GoalsPage() {
 
   // Check auth status and load goals
   useEffect(() => {
-    checkUser();
-    fetchGoals();
+    initializePage();
   }, []);
+
+  const initializePage = async () => {
+    setLoading(true);
+    await Promise.all([checkUser(), fetchGoals()]);
+    setLoading(false);
+  };
 
   const checkUser = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     setUser(user);
-    setLoading(false);
   };
 
   const fetchGoals = async () => {
@@ -87,10 +91,15 @@ export default function GoalsPage() {
       const data = await response.json();
       
       if (data.success) {
+        console.log("Loaded goals from Supabase:", data.goals);
         setGoals(data.goals);
+      } else {
+        console.error("Failed to load goals:", data.error);
+        setMessage({ type: "error", text: "Failed to load goals from database" });
       }
     } catch (error) {
       console.error("Error fetching goals:", error);
+      setMessage({ type: "error", text: "Error connecting to database" });
     }
   };
 
@@ -340,10 +349,11 @@ export default function GoalsPage() {
                           type="number"
                           min="0"
                           step="0.01"
-                          value={goals[kpi.id]?.[period] || 0}
+                          value={goals[kpi.id]?.[period] ?? ""}
                           onChange={(e) =>
                             handleGoalChange(kpi.id, period, e.target.value)
                           }
+                          placeholder="0"
                           className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
