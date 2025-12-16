@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, getServiceRoleClient } from '@/lib/supabase';
 
 /**
  * Goals API Routes (Supabase Version)
@@ -130,8 +130,9 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Upsert goals to Supabase (insert or update if exists)
-    const { error: upsertError } = await supabase
+    // Upsert goals to Supabase using service role (bypasses RLS after auth check)
+    const serviceClient = getServiceRoleClient();
+    const { error: upsertError } = await serviceClient
       .from('goals')
       .upsert(upsertData, {
         onConflict: 'kpi_id,period',

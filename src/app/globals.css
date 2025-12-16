@@ -51,6 +51,24 @@ body {
   background: #94a3b8;
 }
 
+/* Input styles */
+input[type="number"],
+input[type="email"],
+input[type="password"],
+input[type="text"] {
+  background-color: var(--background);
+  background: unset;
+}
+
+/* Override autofill styles */
+input[type="number"]:-webkit-autofill,
+input[type="email"]:-webkit-autofill,
+input[type="password"]:-webkit-autofill,
+input[type="text"]:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--background) inset;
+  box-shadow: 0 0 0 1000px var(--background) inset;
+}
+
 /* Animation utilities */
 @layer utilities {
   .animate-fade-in {

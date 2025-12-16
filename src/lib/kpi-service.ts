@@ -447,11 +447,15 @@ export async function getAvgDaysPPToInstall(period: TimePeriod): Promise<KPIValu
   
   const goal = await getGoal('avg_days_pp_to_install', period);
   
+  // For cycle times, lower is better - calculate inverse percentage
+  const percentToGoal = goal && value > 0 ? Math.round((goal / value) * 100) : undefined;
+  
   return {
     value,
     formatted: formatDays(value),
     goal,
     goalFormatted: goal ? formatDays(goal) : undefined,
+    percentToGoal,
     status: goal ? (value <= goal ? 'success' : value <= goal * 1.2 ? 'warning' : 'danger') : 'neutral',
   };
 }
@@ -473,11 +477,15 @@ export async function getAvgDaysInstallToM2(period: TimePeriod): Promise<KPIValu
   
   const goal = await getGoal('avg_days_install_to_m2', period);
   
+  // For cycle times, lower is better - calculate inverse percentage
+  const percentToGoal = goal && value > 0 ? Math.round((goal / value) * 100) : undefined;
+  
   return {
     value,
     formatted: formatDays(value),
     goal,
     goalFormatted: goal ? formatDays(goal) : undefined,
+    percentToGoal,
     status: goal ? (value <= goal ? 'success' : value <= goal * 1.2 ? 'warning' : 'danger') : 'neutral',
   };
 }
@@ -498,11 +506,15 @@ export async function getAvgDaysPPToPTO(period: TimePeriod): Promise<KPIValue> {
   
   const goal = await getGoal('avg_days_pp_to_pto', period);
   
+  // For cycle times, lower is better - calculate inverse percentage
+  const percentToGoal = goal && value > 0 ? Math.round((goal / value) * 100) : undefined;
+  
   return {
     value,
     formatted: formatDays(value),
     goal,
     goalFormatted: goal ? formatDays(goal) : undefined,
+    percentToGoal,
     status: goal ? (value <= goal ? 'success' : value <= goal * 1.2 ? 'warning' : 'danger') : 'neutral',
   };
 }
