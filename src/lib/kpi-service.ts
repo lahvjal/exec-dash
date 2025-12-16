@@ -1,7 +1,6 @@
 import { query, queryOne } from './db';
 import { TimePeriod, KPIValue, KPITrend, KPIStatus } from '@/types/kpi';
-import { promises as fs } from 'fs';
-import path from 'path';
+import { supabase } from './supabase';
 
 /**
  * KPI Service Layer
@@ -150,18 +149,16 @@ function calculateStatus(value: number, goal?: number): KPIStatus {
 }
 
 // =============================================================================
-// GOALS MANAGEMENT
+// GOALS MANAGEMENT (Supabase)
 // =============================================================================
 
-const GOALS_FILE_PATH = path.join(process.cwd(), 'data', 'goals.json');
-
-// Cache goals in memory to avoid file reads on every request
+// Cache goals in memory to avoid database queries on every request
 let goalsCache: any = null;
 let goalsCacheTime: number = 0;
 const GOALS_CACHE_TTL = 60000; // 1 minute
 
 /**
- * Load goals from JSON file with caching
+ * Load goals from Supabase with caching
  */
 async function loadGoals(): Promise<any> {
   const now = Date.now();
@@ -172,12 +169,29 @@ async function loadGoals(): Promise<any> {
   }
   
   try {
-    const fileContent = await fs.readFile(GOALS_FILE_PATH, 'utf-8');
-    goalsCache = JSON.parse(fileContent);
+    const { data, error } = await supabase
+      .from('goals')
+      .select('*');
+    
+    if (error) {
+      throw error;
+    }
+    
+    // Transform database rows into goals object structure
+    const goals: Record<string, Record<string, number>> = {};
+    
+    data?.forEach((row: any) => {
+      if (!goals[row.kpi_id]) {
+        goals[row.kpi_id] = {};
+      }
+      goals[row.kpi_id][row.period] = parseFloat(row.value);
+    });
+    
+    goalsCache = goals;
     goalsCacheTime = now;
-    return goalsCache;
+    return goals;
   } catch (error) {
-    console.error('Error loading goals:', error);
+    console.error('Error loading goals from Supabase:', error);
     // Return default goals as fallback
     return {
       total_sales: {

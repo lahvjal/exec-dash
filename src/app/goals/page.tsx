@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { Header } from "@/components/header";
-import { ArrowLeft, Save, Loader2, Check, AlertCircle, Lock } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Check, AlertCircle, Lock, LogOut } from "lucide-react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
+import type { User } from "@supabase/supabase-js";
 
 interface Goals {
   [kpiId: string]: {
@@ -59,16 +61,25 @@ const PERIOD_LABELS: Record<string, string> = {
 
 export default function GoalsPage() {
   const [goals, setGoals] = useState<Goals>({});
+  const [user, setUser] = useState<User | null>(null);
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loggingIn, setLoggingIn] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Load goals
+  // Check auth status and load goals
   useEffect(() => {
+    checkUser();
     fetchGoals();
   }, []);
+
+  const checkUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    setUser(user);
+    setLoading(false);
+  };
 
   const fetchGoals = async () => {
     try {
@@ -80,9 +91,38 @@ export default function GoalsPage() {
       }
     } catch (error) {
       console.error("Error fetching goals:", error);
-    } finally {
-      setLoading(false);
     }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoggingIn(true);
+    setMessage(null);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        setMessage({ type: "error", text: error.message });
+      } else if (data.user) {
+        setUser(data.user);
+        setMessage({ type: "success", text: "Logged in successfully!" });
+        setPassword("");
+      }
+    } catch (error: any) {
+      setMessage({ type: "error", text: "An error occurred during login" });
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setMessage({ type: "success", text: "Logged out successfully" });
   };
 
   const handleGoalChange = (kpiId: string, period: string, value: string) => {
@@ -100,8 +140,8 @@ export default function GoalsPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!isAuthenticated) {
-      setMessage({ type: "error", text: "Please enter the password first" });
+    if (!user) {
+      setMessage({ type: "error", text: "Please log in first" });
       return;
     }
 
@@ -109,12 +149,21 @@ export default function GoalsPage() {
     setMessage(null);
 
     try {
+      // Get the session token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        setMessage({ type: "error", text: "Session expired. Please log in again." });
+        return;
+      }
+
       const response = await fetch("/api/goals", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ goals, password }),
+        body: JSON.stringify({ goals }),
       });
 
       const data = await response.json();
@@ -131,12 +180,6 @@ export default function GoalsPage() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleAuthenticate = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsAuthenticated(true);
-    setMessage(null);
   };
 
   if (loading) {
@@ -161,19 +204,36 @@ export default function GoalsPage() {
           Back to Dashboard
         </Link>
 
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">
-            KPI Goals Management
-          </h1>
-          <p className="text-slate-600">
-            Set target goals for each KPI across different time periods
-          </p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 mb-2">
+              KPI Goals Management
+            </h1>
+            <p className="text-slate-600">
+              Set target goals for each KPI across different time periods
+            </p>
+          </div>
+          
+          {user && (
+            <div className="flex items-center gap-4">
+              <div className="text-sm text-slate-600">
+                Logged in as: <span className="font-medium text-slate-900">{user.email}</span>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-4 py-2 text-sm text-slate-600 hover:text-slate-900 border border-slate-300 rounded-lg hover:border-slate-400 transition-colors"
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Password Protection */}
-        {!isAuthenticated && (
+        {/* Login Form */}
+        {!user && (
           <form
-            onSubmit={handleAuthenticate}
+            onSubmit={handleLogin}
             className="bg-white rounded-xl border border-slate-200 p-6 mb-6 max-w-md"
           >
             <div className="flex items-center gap-3 mb-4">
@@ -183,24 +243,52 @@ export default function GoalsPage() {
               </h2>
             </div>
             <p className="text-sm text-slate-600 mb-4">
-              Enter the password to edit goals
+              Log in with your Supabase credentials to edit goals
             </p>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter password"
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
-              required
-            />
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your-email@example.com"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter password"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+            </div>
             <button
               type="submit"
-              className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              disabled={loggingIn}
+              className="w-full mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Unlock
+              {loggingIn ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Logging in...
+                </>
+              ) : (
+                "Login"
+              )}
             </button>
             <p className="text-xs text-slate-500 mt-3">
-              Default password: aveyo2025 (can be changed in .env.local as GOALS_PASSWORD)
+              Use the Supabase credentials you set up in Authentication {">"} Users
             </p>
           </form>
         )}
@@ -230,7 +318,7 @@ export default function GoalsPage() {
         )}
 
         {/* Goals Form */}
-        {isAuthenticated && (
+        {user && (
           <form onSubmit={handleSave}>
             <div className="space-y-6 mb-6">
               {KPI_DEFINITIONS.map((kpi) => (
@@ -269,7 +357,7 @@ export default function GoalsPage() {
             <div className="sticky bottom-6 bg-white rounded-xl border border-slate-200 p-6 shadow-lg">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-slate-600">
-                  Changes will be applied immediately after saving
+                  Changes will be saved to Supabase database
                 </p>
                 <button
                   type="submit"

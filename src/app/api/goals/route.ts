@@ -1,21 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
-
-const GOALS_FILE_PATH = path.join(process.cwd(), 'data', 'goals.json');
+import { supabase } from '@/lib/supabase';
 
 /**
- * Goals API Routes
+ * Goals API Routes (Supabase Version)
  * 
  * GET /api/goals - Retrieve all goals
- * POST /api/goals - Update goals (requires password)
+ * POST /api/goals - Update goals (requires authentication)
  */
 
 // GET - Retrieve all goals
 export async function GET(request: NextRequest) {
   try {
-    const fileContent = await fs.readFile(GOALS_FILE_PATH, 'utf-8');
-    const goals = JSON.parse(fileContent);
+    const { data, error } = await supabase
+      .from('goals')
+      .select('*')
+      .order('kpi_id', { ascending: true });
+    
+    if (error) {
+      throw error;
+    }
+    
+    // Transform database rows into goals object structure
+    const goals: Record<string, Record<string, number>> = {};
+    
+    data?.forEach((row: any) => {
+      if (!goals[row.kpi_id]) {
+        goals[row.kpi_id] = {};
+      }
+      goals[row.kpi_id][row.period] = parseFloat(row.value);
+    });
     
     return NextResponse.json({
       success: true,
@@ -30,18 +43,28 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Update goals
+// POST - Update goals (requires authentication)
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { goals, password } = body;
+    const { goals } = body;
     
-    // Simple password protection (in production, use proper authentication)
-    const ADMIN_PASSWORD = process.env.GOALS_PASSWORD || 'aveyo2025';
-    
-    if (password !== ADMIN_PASSWORD) {
+    // Check authentication via Supabase
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader) {
       return NextResponse.json(
-        { success: false, error: 'Invalid password' },
+        { success: false, error: 'Missing authorization header' },
+        { status: 401 }
+      );
+    }
+    
+    // Verify the session token
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
         { status: 401 }
       );
     }
@@ -66,7 +89,9 @@ export async function POST(request: NextRequest) {
     
     const validPeriods = ['current_week', 'previous_week', 'mtd', 'ytd', 'next_week'];
     
-    // Validate structure
+    // Prepare data for upsert
+    const upsertData: Array<{ kpi_id: string; period: string; value: number }> = [];
+    
     for (const [kpiId, periods] of Object.entries(goals)) {
       if (!validKpis.includes(kpiId)) {
         return NextResponse.json(
@@ -96,11 +121,25 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
+        
+        upsertData.push({
+          kpi_id: kpiId,
+          period,
+          value,
+        });
       }
     }
     
-    // Write to file
-    await fs.writeFile(GOALS_FILE_PATH, JSON.stringify(goals, null, 2), 'utf-8');
+    // Upsert goals to Supabase (insert or update if exists)
+    const { error: upsertError } = await supabase
+      .from('goals')
+      .upsert(upsertData, {
+        onConflict: 'kpi_id,period',
+      });
+    
+    if (upsertError) {
+      throw upsertError;
+    }
     
     return NextResponse.json({
       success: true,
