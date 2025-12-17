@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/header";
 import { TimeFilter } from "@/components/time-filter";
 import { KPISection } from "@/components/kpi-section";
@@ -14,6 +14,20 @@ export default function Dashboard() {
   
   // Fetch KPI data from API
   const { data: kpiData, loading, error, refetch } = useKPIData(DASHBOARD_SECTIONS, selectedPeriod);
+  
+  // Listen for goal updates and refetch data
+  useEffect(() => {
+    const handleGoalsUpdated = () => {
+      console.log('Goals updated, refetching KPI data...');
+      refetch();
+    };
+    
+    window.addEventListener('goals-updated', handleGoalsUpdated);
+    
+    return () => {
+      window.removeEventListener('goals-updated', handleGoalsUpdated);
+    };
+  }, [refetch]);
 
   return (
     <div className="min-h-screen bg-slate-50">

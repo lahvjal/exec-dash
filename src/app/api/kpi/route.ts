@@ -43,6 +43,14 @@ function setCachedValue(kpiId: string, period: TimePeriod, data: KPIValue): void
   cache.set(key, { data, timestamp: Date.now() });
 }
 
+/**
+ * Clear all KPI cache (call when goals are updated)
+ */
+export function clearKPICache(): void {
+  cache.clear();
+  console.log('KPI cache cleared');
+}
+
 // GET /api/kpi?kpiId=xxx&period=xxx
 export async function GET(request: NextRequest) {
   try {

@@ -158,6 +158,15 @@ let goalsCacheTime: number = 0;
 const GOALS_CACHE_TTL = 60000; // 1 minute
 
 /**
+ * Invalidate the goals cache (call when goals are updated)
+ */
+export function invalidateGoalsCache(): void {
+  goalsCache = null;
+  goalsCacheTime = 0;
+  console.log('Goals cache invalidated');
+}
+
+/**
  * Load goals from Supabase with caching
  */
 async function loadGoals(): Promise<any> {

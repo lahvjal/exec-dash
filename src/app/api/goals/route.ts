@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getServiceRoleClient } from '@/lib/supabase';
+import { invalidateGoalsCache } from '@/lib/kpi-service';
 
 /**
  * Goals API Routes (Supabase Version)
@@ -141,6 +142,10 @@ export async function POST(request: NextRequest) {
     if (upsertError) {
       throw upsertError;
     }
+    
+    // Invalidate goals cache immediately so updated goals appear right away
+    invalidateGoalsCache();
+    console.log('Goals saved and cache invalidated');
     
     return NextResponse.json({
       success: true,

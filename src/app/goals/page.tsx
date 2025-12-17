@@ -178,9 +178,13 @@ export default function GoalsPage() {
       const data = await response.json();
 
       if (data.success) {
-        setMessage({ type: "success", text: "Goals updated successfully!" });
-        // Refresh to show updated values
+        setMessage({ type: "success", text: "Goals updated successfully! Dashboard will refresh automatically." });
+        // Refresh goals to show updated values
         await fetchGoals();
+        
+        // Notify the dashboard to refetch KPI data
+        // This will trigger an immediate refresh on the main dashboard
+        window.dispatchEvent(new CustomEvent('goals-updated'));
       } else {
         setMessage({ type: "error", text: data.error || "Failed to update goals" });
       }
