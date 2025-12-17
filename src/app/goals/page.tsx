@@ -183,8 +183,13 @@ export default function GoalsPage() {
         await fetchGoals();
         
         // Notify the dashboard to refetch KPI data
-        // This will trigger an immediate refresh on the main dashboard
+        // Custom event for same tab
         window.dispatchEvent(new CustomEvent('goals-updated'));
+        
+        // LocalStorage for cross-tab communication
+        localStorage.setItem('goals-updated', Date.now().toString());
+        
+        console.log('✅ Goals saved, cache cleared, events dispatched');
       } else {
         setMessage({ type: "error", text: data.error || "Failed to update goals" });
       }

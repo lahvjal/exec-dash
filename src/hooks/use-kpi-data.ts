@@ -28,7 +28,7 @@ export function useKPIData(sections: KPISection[], period: TimePeriod): UseKPIDa
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const fetchKPIData = async () => {
+  const fetchKPIData = async (bustCache = false) => {
     setLoading(true);
     setError(null);
     
@@ -45,11 +45,15 @@ export function useKPIData(sections: KPISection[], period: TimePeriod): UseKPIDa
         });
       });
       
+      // Add cache-busting parameter if needed
+      const url = bustCache ? `/api/kpi?t=${Date.now()}` : '/api/kpi';
+      
       // Fetch all KPIs in batch
-      const response = await fetch('/api/kpi', {
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(bustCache ? { 'Cache-Control': 'no-cache' } : {}),
         },
         body: JSON.stringify({ kpis: kpisToFetch }),
       });
@@ -94,7 +98,7 @@ export function useKPIData(sections: KPISection[], period: TimePeriod): UseKPIDa
     data,
     loading,
     error,
-    refetch: fetchKPIData,
+    refetch: () => fetchKPIData(true), // Always bust cache on manual refetch
   };
 }
 

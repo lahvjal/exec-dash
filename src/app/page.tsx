@@ -18,14 +18,27 @@ export default function Dashboard() {
   // Listen for goal updates and refetch data
   useEffect(() => {
     const handleGoalsUpdated = () => {
-      console.log('Goals updated, refetching KPI data...');
+      console.log('🔄 Goals updated event received, refetching KPI data...');
       refetch();
     };
     
+    // Listen for custom event (same tab)
     window.addEventListener('goals-updated', handleGoalsUpdated);
+    
+    // Listen for storage event (cross-tab)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'goals-updated') {
+        console.log('🔄 Goals updated in another tab, refetching KPI data...');
+        refetch();
+        // Clean up the flag
+        localStorage.removeItem('goals-updated');
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
     
     return () => {
       window.removeEventListener('goals-updated', handleGoalsUpdated);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, [refetch]);
 
