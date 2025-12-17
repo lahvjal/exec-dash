@@ -252,7 +252,7 @@ export default function GoalsPage() {
         {!user && (
           <form
             onSubmit={handleLogin}
-            className="bg-white rounded-xl border border-slate-200 p-6 mb-6 max-w-md"
+            className="bg-white rounded-card border border-slate-200 p-6 mb-6 max-w-md"
           >
             <div className="flex items-center gap-3 mb-4">
               <Lock className="h-5 w-5 text-slate-400" />
@@ -342,7 +342,7 @@ export default function GoalsPage() {
               {KPI_DEFINITIONS.map((kpi) => (
                 <div
                   key={kpi.id}
-                  className="bg-white rounded-xl border border-slate-200 p-6"
+                  className="bg-white rounded-card border border-slate-200 p-6"
                 >
                   <h3 className="text-lg font-semibold text-slate-900 mb-4">
                     {kpi.name}
@@ -373,7 +373,7 @@ export default function GoalsPage() {
             </div>
 
             {/* Save Button */}
-            <div className="sticky bottom-6 bg-white rounded-xl border border-slate-200 p-6 shadow-lg">
+            <div className="sticky bottom-6 bg-white rounded-card border border-slate-200 p-6 shadow-lg">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-slate-600">
                   Changes will be saved to Supabase database

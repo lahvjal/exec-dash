@@ -10,6 +10,7 @@
   --border: #e2e8f0;
   --muted: #f1f5f9;
   --muted-foreground: #64748b;
+  --font-telegraf: "Telegraf", system-ui, -apple-system, sans-serif;
 }
 
 * {
@@ -26,6 +27,7 @@ body {
 body {
   color: var(--foreground);
   background: var(--background);
+  font-family: var(--font-telegraf);
   font-feature-settings: "rlig" 1, "calt" 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

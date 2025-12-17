@@ -2,6 +2,7 @@
 
 import { Bell, Settings, User, Target } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 
 export function Header() {
@@ -13,12 +14,17 @@ export function Header() {
       <div className="flex h-16 items-center justify-between px-6">
         {/* Logo & Title */}
         <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary-500 to-primary-600 text-white font-bold text-lg shadow-sm">
-            A
-          </div>
+          <Image
+            src="/logo/aveyo-logo.svg"
+            alt="Aveyo Logo"
+            width={112}
+            height={24}
+            priority
+            className="h-6 w-auto"
+          />
+          <div className="h-6 w-px bg-slate-200 ml-1" />
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">Aveyo</h1>
-            <p className="text-xs text-slate-500">KPI Dashboard</p>
+            <p className="text-xs text-slate-500 font-medium">KPI Dashboard</p>
           </div>
         </Link>
 

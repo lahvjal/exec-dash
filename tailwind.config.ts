@@ -8,6 +8,9 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      borderRadius: {
+        'card': '10px',
+      },
       colors: {
         primary: {
           50: "#f0f9ff",
@@ -41,8 +44,7 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
-        mono: ["var(--font-geist-mono)", "monospace"],
+        sans: ["var(--font-telegraf)", "system-ui", "-apple-system", "sans-serif"],
       },
     },
   },

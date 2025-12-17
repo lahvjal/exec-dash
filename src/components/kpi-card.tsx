@@ -86,7 +86,7 @@ export function KPICard({
     return (
       <div
         className={cn(
-          "rounded-xl border p-5 transition-all duration-200 min-h-[160px] h-full flex flex-col",
+          "rounded-card border p-5 transition-all duration-200 min-h-[160px] h-full flex flex-col",
           "border-slate-200 bg-slate-50/50",
           className
         )}
@@ -107,7 +107,7 @@ export function KPICard({
   return (
     <div
       className={cn(
-        "rounded-xl border p-5 transition-all duration-200 hover:shadow-md min-h-[160px] h-full flex flex-col",
+        "rounded-card border p-5 transition-all duration-200 hover:shadow-md min-h-[160px] h-full flex flex-col",
         styles.card,
         className
       )}

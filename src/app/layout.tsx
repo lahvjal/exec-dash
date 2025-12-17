@@ -1,10 +1,36 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-geist-sans",
+const telegraf = localFont({
+  src: [
+    {
+      path: "../../public/font/Telegraf/PPTelegraf-Ultralight.woff2",
+      weight: "200",
+      style: "normal",
+    },
+    {
+      path: "../../public/font/Telegraf/PPTelegraf-Regular.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../public/font/Telegraf/PPTelegraf-Bold.woff2",
+      weight: "700",
+      style: "normal",
+    },
+    {
+      path: "../../public/font/Telegraf/PPTelegraf-Ultrabold.woff2",
+      weight: "800",
+      style: "normal",
+    },
+    {
+      path: "../../public/font/Telegraf/PPTelegraf-Black.woff2",
+      weight: "900",
+      style: "normal",
+    },
+  ],
+  variable: "--font-telegraf",
 });
 
 export const metadata: Metadata = {
@@ -19,7 +45,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className={`${telegraf.variable} font-sans antialiased`}>
         {children}
       </body>
     </html>
