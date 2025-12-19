@@ -10,16 +10,29 @@ import { useKPIData } from "@/hooks/use-kpi-data";
 
 export default function Dashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>("current_week");
-  const [lastUpdated] = useState(new Date());
+  const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Fetch KPI data from API
   const { data: kpiData, loading, error, refetch } = useKPIData(DASHBOARD_SECTIONS, selectedPeriod);
+  
+  // Handle manual refresh
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+      setLastUpdated(new Date());
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
   
   // Listen for goal updates and refetch data
   useEffect(() => {
     const handleGoalsUpdated = () => {
       console.log('🔄 Goals updated event received, refetching KPI data...');
       refetch();
+      setLastUpdated(new Date());
     };
     
     // Listen for custom event (same tab)
@@ -30,6 +43,7 @@ export default function Dashboard() {
       if (e.key === 'goals-updated') {
         console.log('🔄 Goals updated in another tab, refetching KPI data...');
         refetch();
+        setLastUpdated(new Date());
         // Clean up the flag
         localStorage.removeItem('goals-updated');
       }
@@ -48,21 +62,33 @@ export default function Dashboard() {
 
       {/* Page Header */}
       <div className="px-6 pt-6 max-w-[1600px] mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">
-            Executive Dashboard
-          </h1>
-          <div className="flex items-center gap-2 mt-1 text-sm text-slate-500">
-            <RefreshCw className="h-3.5 w-3.5" />
-            <span>
-              Last updated: {lastUpdated.toLocaleString("en-US", {
-                month: "short",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-              })}
-            </span>
+        <div className="mb-6 flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">
+              Executive Dashboard
+            </h1>
+            <div className="flex items-center gap-2 mt-1 text-sm text-slate-500">
+              <RefreshCw className="h-3.5 w-3.5" />
+              <span>
+                Last updated: {lastUpdated.toLocaleString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </span>
+            </div>
           </div>
+          
+          {/* Refresh Button */}
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing || loading}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
+          </button>
         </div>
       </div>
 
@@ -118,7 +144,7 @@ export default function Dashboard() {
 
         {/* Footer */}
         <footer className="mt-12 pt-6 border-t border-slate-200 text-center text-sm text-slate-400">
-          <p>Aveyo KPI Dashboard &bull; Data refreshes every 15 minutes</p>
+          <p>Aveyo KPI Dashboard &bull; Data cached for 15 minutes &bull; Use Refresh button for latest data</p>
         </footer>
       </main>
     </div>

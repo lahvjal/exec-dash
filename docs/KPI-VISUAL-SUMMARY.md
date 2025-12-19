@@ -36,6 +36,9 @@
 13. **A/R (M2/M3)** now filters by active project statuses only (Active, New Lender, Finance Hold, Pre-Approvals) - excludes Complete, Cancelled, On Hold, Pending Cancel
 14. **A/R (M2/M3)** now displays project count alongside total dollar amount for better insight into pipeline
 15. **Revenue Received** now displays project count alongside total dollar amount to show how many projects contributed to revenue
+16. **A/R (M2/M3)** now shows M2 and M3 breakdown in project count display (e.g., "5 projects (3 M2, 2 M3)") for granular pipeline visibility
+17. **A/R (M2/M3)** updated to use `m3-received-date` field instead of `m3-approved` for consistent milestone tracking with M1/M2
+18. **A/R (M2/M3)** migrated to use `funding` table as primary data source for all M2/M3 milestone tracking (uses `project_ids` for joining)
 
 ### Database Value Analysis:
 - **8 unique project statuses** identified: Active (713), Complete (2,474), Cancelled (2,247), On Hold (286), Pending Cancel (191), Finance Hold (124), Pre-Approvals (6), New Lender (4)
@@ -193,47 +196,71 @@ Median: 55 days (middle value when sorted: 45, 55, 69)
 
 | KPI | Data Source | Calculation Type |
 |-----|-------------|------------------|
-| **A/R (M2/M3)** | `project-data.contract-price` + `project-data.m2/m3-submitted/received` | SUM M2 + M3 (active projects only) + COUNT projects |
+| **A/R (M2/M3)** | `funding.contract-price` + `funding.m2/m3-submitted-date/received-date` | SUM M2 + M3 (active projects only) + COUNT projects |
 | **Revenue Received** | `project-data.m1/m2-received-date` + `contract-price` | SUM by period + COUNT projects |
 | **Install M2 Not Approved** | `timeline.install-complete` + `project-data.m2-approved` | SUM M2 amounts |
 
 **Data Flow for A/R (M2/M3)**:
 ```
+📌 DATA SOURCE: FUNDING TABLE (primary source for M2/M3 milestone tracking)
+
 M2 Outstanding (80% of contract):
-  SELECT SUM(pd.`contract-price` * 0.8) AS m2_amount
-  FROM `project-data` pd
-  LEFT JOIN timeline t ON pd.`project-dev-id` = t.`project-dev-id`
-  WHERE pd.`m2-submitted` IS NOT NULL
-    AND pd.`m2-received-date` IS NULL
-    AND pd.`project-status` IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')
+  SELECT SUM(f.`contract-price` * 0.8) AS m2_amount
+  FROM funding f
+  LEFT JOIN timeline t ON f.project_ids = t.`project-dev-id`
+  WHERE f.`m2-submitted-date` IS NOT NULL
+    AND f.`m2-received-date` IS NULL
+    AND f.`project-status-2` IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')
     AND (t.`cancellation-reason` IS NULL OR t.`cancellation-reason` != 'Duplicate Project (Error)')
 
 M3 Outstanding (20% of contract):
-  SELECT SUM(pd.`contract-price` * 0.2) AS m3_amount
-  FROM `project-data` pd
-  LEFT JOIN timeline t ON pd.`project-dev-id` = t.`project-dev-id`
-  WHERE pd.`m3-submitted` IS NOT NULL
-    AND pd.`m3-approved` IS NULL
-    AND pd.`project-status` IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')
+  SELECT SUM(f.`contract-price` * 0.2) AS m3_amount
+  FROM funding f
+  LEFT JOIN timeline t ON f.project_ids = t.`project-dev-id`
+  WHERE f.`m3-submitted-date` IS NOT NULL
+    AND f.`m3-received-date` IS NULL
+    AND f.`project-status-2` IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')
     AND (t.`cancellation-reason` IS NULL OR t.`cancellation-reason` != 'Duplicate Project (Error)')
 
-Project Count:
-  SELECT COUNT(DISTINCT pd.`project-dev-id`) AS project_count
-  FROM `project-data` pd
-  LEFT JOIN timeline t ON pd.`project-dev-id` = t.`project-dev-id`
-  WHERE pd.`project-status` IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')
+M2 Project Count:
+  SELECT COUNT(DISTINCT f.project_ids) AS m2_count
+  FROM funding f
+  LEFT JOIN timeline t ON f.project_ids = t.`project-dev-id`
+  WHERE f.`m2-submitted-date` IS NOT NULL
+    AND f.`m2-received-date` IS NULL
+    AND f.`project-status-2` IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')
+    AND (t.`cancellation-reason` IS NULL OR t.`cancellation-reason` != 'Duplicate Project (Error)')
+
+M3 Project Count:
+  SELECT COUNT(DISTINCT f.project_ids) AS m3_count
+  FROM funding f
+  LEFT JOIN timeline t ON f.project_ids = t.`project-dev-id`
+  WHERE f.`m3-submitted-date` IS NOT NULL
+    AND f.`m3-received-date` IS NULL
+    AND f.`project-status-2` IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')
+    AND (t.`cancellation-reason` IS NULL OR t.`cancellation-reason` != 'Duplicate Project (Error)')
+
+Total Project Count:
+  SELECT COUNT(DISTINCT f.project_ids) AS project_count
+  FROM funding f
+  LEFT JOIN timeline t ON f.project_ids = t.`project-dev-id`
+  WHERE f.`project-status-2` IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')
     AND (t.`cancellation-reason` IS NULL OR t.`cancellation-reason` != 'Duplicate Project (Error)')
     AND (
-      (pd.`m2-submitted` IS NOT NULL AND pd.`m2-received-date` IS NULL)
+      (f.`m2-submitted-date` IS NOT NULL AND f.`m2-received-date` IS NULL)
       OR
-      (pd.`m3-submitted` IS NOT NULL AND pd.`m3-approved` IS NULL)
+      (f.`m3-submitted-date` IS NOT NULL AND f.`m3-received-date` IS NULL)
     )
 
 Total A/R = M2 Outstanding + M3 Outstanding
-Displayed: Total $ Amount + Number of Projects
+Displayed: Total $ Amount + Total Projects (M2 Count, M3 Count)
 
 ✅ ONLY includes active projects (Active, New Lender, Finance Hold, Pre-Approvals)
 ❌ Excludes Complete, Cancelled, On Hold, Pending Cancel
+
+🔗 Join Fields:
+  - funding.project_ids → timeline.project-dev-id (for duplicate check)
+  - Status field: funding.project-status-2 (not project-status)
 ```
 
 **Data Flow for Revenue Received**:
@@ -301,11 +328,13 @@ Project #105: $48,000 contract - M2 submitted, not received - Status: On Hold
   ✗ Exclude (On Hold status - payment process frozen)
 
 Total A/R Amount: $40,000 + $9,000 = $49,000
-Project Count: 2 projects (Projects #101 and #102)
+Total Project Count: 2 projects (Projects #101 and #102)
+M2 Count: 1 project (Project #101)
+M3 Count: 1 project (Project #102)
 
 Dashboard Display:
   Primary: $49,000
-  Secondary: 2 projects
+  Secondary: 2 projects (1 M2, 1 M3)
 ```
 
 ---

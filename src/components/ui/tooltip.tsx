@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Info } from "lucide-react";
+import { Info, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface TooltipProps {
@@ -11,71 +11,78 @@ interface TooltipProps {
 }
 
 export function Tooltip({ content, children, className }: TooltipProps) {
-  const [isVisible, setIsVisible] = useState(false);
-  const [position, setPosition] = useState<'top' | 'bottom'>('top');
-  const triggerRef = useRef<HTMLDivElement>(null);
-  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const modalRef = useRef<HTMLDivElement>(null);
 
+  // Handle ESC key to close modal
   useEffect(() => {
-    if (isVisible && triggerRef.current && tooltipRef.current) {
-      const triggerRect = triggerRef.current.getBoundingClientRect();
-      const tooltipRect = tooltipRef.current.getBoundingClientRect();
-      const spaceAbove = triggerRect.top;
-      const spaceBelow = window.innerHeight - triggerRect.bottom;
-
-      // If not enough space above and more space below, show tooltip below
-      if (spaceAbove < tooltipRect.height + 10 && spaceBelow > spaceAbove) {
-        setPosition('bottom');
-      } else {
-        setPosition('top');
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        setIsOpen(false);
       }
+    };
+
+    if (isOpen) {
+      document.addEventListener("keydown", handleEscape);
+      // Prevent body scroll when modal is open
+      document.body.style.overflow = "hidden";
     }
-  }, [isVisible]);
+
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen]);
+
+  // Handle click outside to close modal
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      setIsOpen(false);
+    }
+  };
 
   return (
-    <div className="relative inline-block">
-      <div
-        ref={triggerRef}
-        onMouseEnter={() => setIsVisible(true)}
-        onMouseLeave={() => setIsVisible(false)}
-        onClick={() => setIsVisible(!isVisible)}
-        className="cursor-help"
+    <>
+      <button
+        onClick={() => setIsOpen(true)}
+        className="inline-flex items-center justify-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded-full"
+        aria-label="Show calculation details"
       >
         {children || (
           <Info className="h-4 w-4 text-slate-400 hover:text-slate-600 transition-colors" />
         )}
-      </div>
+      </button>
 
-      {isVisible && (
+      {isOpen && (
         <div
-          ref={tooltipRef}
-          className={cn(
-            "absolute z-50 w-80 p-4 text-sm bg-slate-900 text-white rounded-lg shadow-xl",
-            "animate-in fade-in-0 zoom-in-95 duration-200",
-            position === 'top' 
-              ? "bottom-full mb-2 right-0" 
-              : "top-full mt-2 right-0",
-            className
-          )}
-          style={{
-            maxWidth: 'calc(100vw - 2rem)',
-          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in-0 duration-200"
+          onClick={handleBackdropClick}
         >
-          {/* Arrow */}
           <div
+            ref={modalRef}
             className={cn(
-              "absolute right-2 w-3 h-3 bg-slate-900 transform rotate-45",
-              position === 'top' ? "-bottom-1.5" : "-top-1.5"
+              "relative bg-slate-900 text-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto",
+              "animate-in zoom-in-95 slide-in-from-bottom-4 duration-200",
+              className
             )}
-          />
-          
-          {/* Content */}
-          <div className="relative z-10">
-            {content}
+          >
+            {/* Close button */}
+            <button
+              onClick={() => setIsOpen(false)}
+              className="absolute top-4 right-4 p-1 rounded-full hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-label="Close modal"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            {/* Content */}
+            <div className="p-6 pr-12">
+              {content}
+            </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -91,22 +98,39 @@ interface KPITooltipContentProps {
 
 export function KPITooltipContent({ calculation, dataSources, formula, notes }: KPITooltipContentProps) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-5">
+      {/* Title */}
       <div>
-        <h4 className="font-semibold mb-1 text-white">Calculation</h4>
-        <p className="text-slate-300 text-xs leading-relaxed">{calculation}</p>
+        <h3 className="text-xl font-bold text-white mb-1">KPI Calculation Details</h3>
+        <p className="text-slate-400 text-sm">How this metric is calculated</p>
       </div>
 
+      {/* Calculation */}
       <div>
-        <h4 className="font-semibold mb-1 text-white">Data Sources</h4>
-        <div className="space-y-1">
+        <h4 className="font-semibold mb-2 text-white text-base flex items-center gap-2">
+          <span className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-xs">1</span>
+          Calculation
+        </h4>
+        <p className="text-slate-300 text-sm leading-relaxed ml-8">{calculation}</p>
+      </div>
+
+      {/* Data Sources */}
+      <div>
+        <h4 className="font-semibold mb-2 text-white text-base flex items-center gap-2">
+          <span className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-xs">2</span>
+          Data Sources
+        </h4>
+        <div className="space-y-2 ml-8">
           {dataSources.map((source, idx) => (
-            <div key={idx} className="text-xs">
-              <span className="text-blue-400 font-mono">{source.table}</span>
-              <div className="ml-3 text-slate-300">
+            <div key={idx} className="text-sm bg-slate-800 rounded-lg p-3">
+              <div className="text-blue-400 font-mono font-semibold mb-2">
+                {source.table}
+              </div>
+              <div className="space-y-1 text-slate-300">
                 {source.fields.map((field, fieldIdx) => (
-                  <div key={fieldIdx} className="font-mono text-xs">
-                    • {field}
+                  <div key={fieldIdx} className="font-mono text-xs flex items-center gap-2">
+                    <span className="text-slate-500">•</span>
+                    <span>{field}</span>
                   </div>
                 ))}
               </div>
@@ -115,17 +139,27 @@ export function KPITooltipContent({ calculation, dataSources, formula, notes }: 
         </div>
       </div>
 
+      {/* Formula */}
       <div>
-        <h4 className="font-semibold mb-1 text-white">Formula</h4>
-        <code className="text-xs text-slate-300 bg-slate-800 px-2 py-1 rounded block font-mono">
-          {formula}
-        </code>
+        <h4 className="font-semibold mb-2 text-white text-base flex items-center gap-2">
+          <span className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-xs">3</span>
+          Formula
+        </h4>
+        <div className="ml-8 bg-slate-800 rounded-lg p-3">
+          <code className="text-sm text-slate-300 font-mono whitespace-pre-wrap break-words block">
+            {formula}
+          </code>
+        </div>
       </div>
 
+      {/* Notes */}
       {notes && (
-        <div>
-          <h4 className="font-semibold mb-1 text-yellow-400">Notes</h4>
-          <p className="text-slate-300 text-xs leading-relaxed">{notes}</p>
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+          <h4 className="font-semibold mb-2 text-yellow-400 text-base flex items-center gap-2">
+            <Info className="h-5 w-5" />
+            Important Notes
+          </h4>
+          <p className="text-slate-300 text-sm leading-relaxed">{notes}</p>
         </div>
       )}
     </div>

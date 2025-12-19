@@ -321,19 +321,19 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
         format: "currency",
         availablePeriods: ["current_week", "previous_week", "mtd"],
         calculationMeta: {
-          calculation: "Sum of M2 (80% of contract) and M3 (20% of contract) amounts that have been submitted but not yet received, for active projects only. Also displays total number of projects with outstanding A/R.",
+          calculation: "Sum of M2 (80% of contract) and M3 (20% of contract) amounts that have been submitted but not yet received, for active projects only. Displays total project count with M2 and M3 breakdown.",
           dataSources: [
             {
-              table: "project-data",
-              fields: ["m2-submitted", "m2-received-date", "m3-submitted", "m3-approved", "contract-price", "project-status", "project-dev-id"]
+              table: "funding",
+              fields: ["m2-submitted-date", "m2-received-date", "m3-submitted-date", "m3-received-date", "contract-price", "project-status-2", "project_ids"]
             },
             {
               table: "timeline",
               fields: ["cancellation-reason", "project-dev-id"]
             }
           ],
-          formula: "Amount: SUM(contract-price * 0.8 WHERE m2-submitted NOT NULL AND m2-received-date IS NULL) + SUM(contract-price * 0.2 WHERE m3-submitted NOT NULL AND m3-approved IS NULL) | Project Count: COUNT(DISTINCT project-dev-id WHERE (m2-submitted NOT NULL AND m2-received-date IS NULL) OR (m3-submitted NOT NULL AND m3-approved IS NULL))",
-          notes: "M2 = 80%, M3 = 20% of contract price. Only includes active project statuses (Active, New Lender, Finance Hold, Pre-Approvals). Excludes Complete, Cancelled, On Hold, Pending Cancel, and duplicate projects. Project count shows distinct projects with any outstanding M2 or M3."
+          formula: "Amount: SUM(contract-price * 0.8 WHERE m2-submitted-date NOT NULL AND m2-received-date IS NULL) + SUM(contract-price * 0.2 WHERE m3-submitted-date NOT NULL AND m3-received-date IS NULL) | Total Projects: COUNT(DISTINCT project_ids) | M2 Count: COUNT(DISTINCT project_ids WHERE m2-submitted-date NOT NULL AND m2-received-date IS NULL) | M3 Count: COUNT(DISTINCT project_ids WHERE m3-submitted-date NOT NULL AND m3-received-date IS NULL)",
+          notes: "M2 = 80%, M3 = 20% of contract price. Data sourced from the funding table. Only includes active project statuses (Active, New Lender, Finance Hold, Pre-Approvals). Excludes Complete, Cancelled, On Hold, Pending Cancel, and duplicate projects. Display shows: Total projects (M2 count, M3 count) to provide breakdown of milestone types."
         }
       },
       {

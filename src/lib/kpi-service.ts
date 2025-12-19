@@ -559,47 +559,55 @@ export async function getAvgDaysPPToPTO(period: TimePeriod): Promise<KPIValue> {
 
 export async function getARM2M3(period: TimePeriod): Promise<KPIValue> {
   // Calculate M2 outstanding (80% of contract price for submitted but not received)
+  // NOTE: Now using funding table which has all M2/M3 data
   const m2Sql = `
-    SELECT SUM(pd.\`contract-price\` * 0.8) as m2_total
-    FROM \`project-data\` pd
-    LEFT JOIN \`timeline\` t ON pd.\`project-dev-id\` = t.\`project-dev-id\`
-    WHERE pd.\`m2-submitted\` IS NOT NULL
-      AND pd.\`m2-received-date\` IS NULL
-      AND pd.\`project-status\` IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')
+    SELECT 
+      SUM(f.\`contract-price\` * 0.8) as m2_total,
+      COUNT(DISTINCT f.project_ids) as m2_count
+    FROM funding f
+    LEFT JOIN \`timeline\` t ON f.project_ids = t.\`project-dev-id\`
+    WHERE f.\`m2-submitted-date\` IS NOT NULL
+      AND f.\`m2-received-date\` IS NULL
+      AND f.\`project-status-2\` IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')
       AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
   `;
   
   // Calculate M3 outstanding (20% of contract price for submitted but not received)
+  // NOTE: funding table includes m3-received-date field
   const m3Sql = `
-    SELECT SUM(pd.\`contract-price\` * 0.2) as m3_total
-    FROM \`project-data\` pd
-    LEFT JOIN \`timeline\` t ON pd.\`project-dev-id\` = t.\`project-dev-id\`
-    WHERE pd.\`m3-submitted\` IS NOT NULL
-      AND pd.\`m3-approved\` IS NULL
-      AND pd.\`project-status\` IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')
+    SELECT 
+      SUM(f.\`contract-price\` * 0.2) as m3_total,
+      COUNT(DISTINCT f.project_ids) as m3_count
+    FROM funding f
+    LEFT JOIN \`timeline\` t ON f.project_ids = t.\`project-dev-id\`
+    WHERE f.\`m3-submitted-date\` IS NOT NULL
+      AND f.\`m3-received-date\` IS NULL
+      AND f.\`project-status-2\` IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')
       AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
   `;
   
   // Count distinct projects with outstanding A/R (either M2 or M3)
   const countSql = `
-    SELECT COUNT(DISTINCT pd.\`project-dev-id\`) as project_count
-    FROM \`project-data\` pd
-    LEFT JOIN \`timeline\` t ON pd.\`project-dev-id\` = t.\`project-dev-id\`
-    WHERE pd.\`project-status\` IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')
+    SELECT COUNT(DISTINCT f.project_ids) as project_count
+    FROM funding f
+    LEFT JOIN \`timeline\` t ON f.project_ids = t.\`project-dev-id\`
+    WHERE f.\`project-status-2\` IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')
       AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
       AND (
-        (pd.\`m2-submitted\` IS NOT NULL AND pd.\`m2-received-date\` IS NULL)
+        (f.\`m2-submitted-date\` IS NOT NULL AND f.\`m2-received-date\` IS NULL)
         OR
-        (pd.\`m3-submitted\` IS NOT NULL AND pd.\`m3-approved\` IS NULL)
+        (f.\`m3-submitted-date\` IS NOT NULL AND f.\`m3-received-date\` IS NULL)
       )
   `;
   
-  const m2Result = await queryOne<{ m2_total: number }>(m2Sql);
-  const m3Result = await queryOne<{ m3_total: number }>(m3Sql);
+  const m2Result = await queryOne<{ m2_total: number; m2_count: number }>(m2Sql);
+  const m3Result = await queryOne<{ m3_total: number; m3_count: number }>(m3Sql);
   const countResult = await queryOne<{ project_count: number }>(countSql);
   
   const m2Value = m2Result?.m2_total || 0;
   const m3Value = m3Result?.m3_total || 0;
+  const m2Count = m2Result?.m2_count || 0;
+  const m3Count = m3Result?.m3_count || 0;
   const value = m2Value + m3Value;
   const projectCount = countResult?.project_count || 0;
   
@@ -607,7 +615,7 @@ export async function getARM2M3(period: TimePeriod): Promise<KPIValue> {
     value,
     formatted: formatCurrency(value),
     secondaryValue: projectCount,
-    secondaryFormatted: `${projectCount} project${projectCount !== 1 ? 's' : ''}`,
+    secondaryFormatted: `${projectCount} project${projectCount !== 1 ? 's' : ''} (${m2Count} M2, ${m3Count} M3)`,
   };
 }
 

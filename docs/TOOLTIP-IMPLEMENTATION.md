@@ -1,12 +1,13 @@
-# KPI Tooltips Implementation
+# KPI Calculation Details Modal
 **Date:** December 16, 2025  
+**Last Updated:** December 16, 2025 (Modal Update)  
 **Status:** ✅ Complete - Ready for Testing
 
 ---
 
 ## 🎯 Overview
 
-Added informative tooltips to all 26 KPI cards showing:
+Added informative **centered modal dialogs** to all 26 KPI cards showing:
 - **Calculation**: Plain English explanation of how the KPI is calculated
 - **Data Sources**: Database tables and fields used
 - **Formula**: SQL-like formula showing the exact calculation
@@ -18,11 +19,13 @@ Added informative tooltips to all 26 KPI cards showing:
 
 ### **New Files:**
 
-1. **`src/components/ui/tooltip.tsx`** - Tooltip component
-   - Smart positioning (top/bottom based on space)
-   - Hover and click to show/hide
-   - Mobile-friendly
+1. **`src/components/ui/tooltip.tsx`** - Modal component (formerly tooltip)
+   - **Click-triggered** centered modal (no hover behavior)
+   - **Viewport-centered** with backdrop overlay
+   - **Keyboard accessible** (ESC to close)
+   - **Click-outside to close**
    - Dark theme for contrast
+   - Prevents body scroll when open
 
 ### **Modified Files:**
 
@@ -33,7 +36,7 @@ Added informative tooltips to all 26 KPI cards showing:
 
 2. **`src/components/kpi-card.tsx`**
    - Added `calculationMeta` prop
-   - Integrated `Tooltip` component in header
+   - Integrated modal trigger in header
    - Shows info icon next to KPI title
 
 3. **`src/components/kpi-section.tsx`**
@@ -41,24 +44,30 @@ Added informative tooltips to all 26 KPI cards showing:
 
 ---
 
-## 🎨 Tooltip Features
+## 🎨 Modal Features
 
 ### **Visual Design:**
+- **Centered viewport positioning** with backdrop overlay
 - **Dark background** (slate-900) for high contrast
 - **Light text** (white/slate-300) for readability
 - **Color coding**:
-  - Blue for table names
+  - Blue for section numbers and table names
   - Yellow for warning notes
-  - Monospace font for SQL formulas
-- **Arrow pointer** pointing to info icon
-- **Smooth animations** (fade-in, zoom-in)
+  - Monospace font for SQL formulas and field names
+- **Numbered sections** (1, 2, 3) for easy scanning
+- **Smooth animations** (fade-in, zoom-in, slide-up)
+- **Close button** (X) in top-right corner
 
 ### **Behavior:**
-- **Hover**: Shows tooltip
-- **Click**: Toggles tooltip (mobile-friendly)
-- **Auto-position**: Flips top/bottom based on available space
-- **Max width**: 320px (responsive)
-- **z-index**: 50 (appears above other content)
+- **Click to open**: Click info icon (ℹ️) to open modal
+- **Click to close**: Click X button, backdrop, or press ESC
+- **Centered**: Always centered in viewport
+- **Scrollable**: Content scrolls if too tall (max 80vh)
+- **Body scroll lock**: Prevents background scrolling when open
+- **Max width**: 768px (2xl breakpoint)
+- **Responsive padding**: 1rem on mobile
+- **z-index**: 50 (appears above all other content)
+- **Backdrop**: Semi-transparent black with blur effect
 
 ---
 
@@ -226,12 +235,16 @@ notes: "⚠️ Commercial filter not yet implemented. Currently shows same as re
 ## 🎯 Usage
 
 ### **For Users:**
-1. Hover over the info icon (ℹ️) next to any KPI title
-2. Tooltip appears showing calculation details
-3. Click the icon to toggle on mobile devices
+1. **Click** the info icon (ℹ️) next to any KPI title
+2. **Modal opens** centered on screen showing calculation details
+3. **Close** by:
+   - Clicking the X button in top-right
+   - Clicking outside the modal (on backdrop)
+   - Pressing ESC key
+4. **Scroll** within modal if content is long
 
 ### **For Developers:**
-To add/update tooltip content for a KPI:
+To add/update modal content for a KPI:
 
 1. Open `src/types/kpi.ts`
 2. Find the KPI definition in `DASHBOARD_SECTIONS`
@@ -260,49 +273,72 @@ To add/update tooltip content for a KPI:
 
 ## ✅ Testing Checklist
 
-- [ ] Tooltips appear on hover
-- [ ] Tooltips toggle on click (mobile)
-- [ ] Tooltips position correctly (top/bottom based on space)
-- [ ] All 26 KPIs have tooltips
-- [ ] Formula text is readable
+- [ ] Modals open on click (not hover)
+- [ ] Modals are centered in viewport
+- [ ] All 26 KPIs have modals
+- [ ] Close button works (X in top-right)
+- [ ] ESC key closes modal
+- [ ] Click outside (backdrop) closes modal
+- [ ] Body scroll is locked when modal is open
+- [ ] Modal content is scrollable if needed
+- [ ] Formula text is readable and wraps properly
 - [ ] Table names are highlighted in blue
+- [ ] Section numbers (1, 2, 3) are visible
 - [ ] Warning notes are highlighted in yellow
-- [ ] Tooltips don't overflow viewport
-- [ ] Tooltips work on mobile devices
+- [ ] Modals work on mobile devices
 - [ ] Info icons don't interfere with trend badges
+- [ ] Backdrop blur effect is visible
+- [ ] Animations are smooth
 
 ---
 
 ## 📱 Responsive Behavior
 
-- **Desktop**: Tooltip appears on hover, 320px wide
-- **Tablet**: Click to toggle, responsive width
-- **Mobile**: Click to toggle, max-width adjusted for small screens
-- **Position**: Auto-flips top/bottom based on available space
+- **Desktop**: Click to open, centered modal, max-width 768px
+- **Tablet**: Click to open, full-width with padding
+- **Mobile**: Click to open, full-width with 1rem padding
+- **All devices**: Viewport-centered, scrollable content, backdrop overlay
+- **Touch-friendly**: Large close button, click-outside to close
 
 ---
 
 ## 🎨 Styling Details
 
-### **Tooltip Container:**
+### **Modal Container:**
 - Background: `bg-slate-900`
 - Text: `text-white`
 - Border radius: `rounded-lg`
-- Shadow: `shadow-xl`
-- Padding: `p-4`
-- Width: `w-80` (320px)
+- Shadow: `shadow-2xl`
+- Padding: `p-6 pr-12` (extra right padding for close button)
+- Max width: `max-w-2xl` (768px)
+- Max height: `max-h-[80vh]`
+- Position: `fixed inset-0` with flex centering
+
+### **Backdrop:**
+- Background: `bg-black/50` with `backdrop-blur-sm`
+- Click handler for close on outside click
+- z-index: 50
 
 ### **Content Sections:**
-- **Calculation**: White text, slate-300 for description
-- **Data Sources**: Blue-400 for table names, monospace font for fields
-- **Formula**: Slate-300 text, slate-800 background, monospace font
-- **Notes**: Yellow-400 heading for warnings
+- **Title**: Text-xl, bold, with subtitle
+- **Section Numbers**: Blue-500 circles with white text
+- **Calculation**: White heading, slate-300 description, left margin
+- **Data Sources**: Slate-800 background cards, blue-400 table names, monospace fields
+- **Formula**: Slate-800 background, monospace font, word-wrap enabled
+- **Notes**: Yellow warning box with yellow-400 heading and info icon
 
 ### **Info Icon:**
 - Size: `h-4 w-4`
 - Color: `text-slate-400` (default), `text-slate-600` (hover)
-- Cursor: `cursor-help`
+- Cursor: `cursor-pointer`
 - Transition: Color transition on hover
+- Focus ring: Blue ring on keyboard focus
+
+### **Close Button:**
+- Position: `absolute top-4 right-4`
+- Size: X icon `h-5 w-5`
+- Hover: `hover:bg-slate-800`
+- Focus ring: Blue ring on keyboard focus
 
 ---
 
@@ -312,8 +348,10 @@ To add/update tooltip content for a KPI:
 2. **Add links**: Link to related KPIs or documentation
 3. **Add visuals**: Include small diagrams for complex calculations
 4. **Add history**: Show how the calculation has changed over time
-5. **Keyboard navigation**: Add keyboard shortcuts to open tooltips
-6. **Copy to clipboard**: Allow copying formula text
+5. **Copy to clipboard**: Allow copying formula text
+6. **Print view**: Add print-friendly version of calculation details
+7. **Share link**: Deep link to specific KPI modal
+8. **Expand all**: Button to view all calculations at once
 
 ---
 
@@ -324,6 +362,9 @@ To add/update tooltip content for a KPI:
 - ✅ **Trust**: Understanding the data sources builds confidence
 - ✅ **Education**: Learn about the business metrics and database structure
 - ✅ **Debugging**: Quickly identify why a number might be unexpected
+- ✅ **Better UX**: Click-to-open is more intentional and touch-friendly
+- ✅ **Focused reading**: Centered modal with backdrop reduces distractions
+- ✅ **Accessibility**: Keyboard navigation and proper focus management
 
 ### **For Developers:**
 - ✅ **Documentation**: Calculation logic is documented in code
@@ -333,6 +374,19 @@ To add/update tooltip content for a KPI:
 
 ---
 
+## 🔄 Recent Updates
+
+### **December 16, 2025 - Modal Conversion**
+- ✅ Converted hover tooltips to click-triggered modals
+- ✅ Centered modal positioning with backdrop overlay
+- ✅ Added ESC key and click-outside to close
+- ✅ Enhanced visual design with numbered sections
+- ✅ Improved content layout and spacing for modal format
+- ✅ Added body scroll lock when modal is open
+- ✅ Better mobile experience with larger touch targets
+
+---
+
 **Status:** ✅ Complete and ready for use!
 
-**All 26 KPIs now have informative tooltips with calculation details.** 🎉
+**All 26 KPIs now have informative click-to-open modals with detailed calculation information.** 🎉
