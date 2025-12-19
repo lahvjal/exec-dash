@@ -152,7 +152,12 @@ export function KPICard({
 
       {/* Main Value */}
       <div className="flex-1">
-        <span className="text-3xl font-bold text-slate-900">{data.formatted}</span>
+        <div className="flex flex-col gap-1">
+          <span className="text-3xl font-bold text-slate-900">{data.formatted}</span>
+          {data.secondaryFormatted && (
+            <span className="text-sm text-slate-500">{data.secondaryFormatted}</span>
+          )}
+        </div>
       </div>
 
       {/* Goal Progress */}

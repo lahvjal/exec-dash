@@ -580,16 +580,34 @@ export async function getARM2M3(period: TimePeriod): Promise<KPIValue> {
       AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
   `;
   
+  // Count distinct projects with outstanding A/R (either M2 or M3)
+  const countSql = `
+    SELECT COUNT(DISTINCT pd.\`project-dev-id\`) as project_count
+    FROM \`project-data\` pd
+    LEFT JOIN \`timeline\` t ON pd.\`project-dev-id\` = t.\`project-dev-id\`
+    WHERE pd.\`project-status\` IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+      AND (
+        (pd.\`m2-submitted\` IS NOT NULL AND pd.\`m2-received-date\` IS NULL)
+        OR
+        (pd.\`m3-submitted\` IS NOT NULL AND pd.\`m3-approved\` IS NULL)
+      )
+  `;
+  
   const m2Result = await queryOne<{ m2_total: number }>(m2Sql);
   const m3Result = await queryOne<{ m3_total: number }>(m3Sql);
+  const countResult = await queryOne<{ project_count: number }>(countSql);
   
   const m2Value = m2Result?.m2_total || 0;
   const m3Value = m3Result?.m3_total || 0;
   const value = m2Value + m3Value;
+  const projectCount = countResult?.project_count || 0;
   
   return {
     value,
     formatted: formatCurrency(value),
+    secondaryValue: projectCount,
+    secondaryFormatted: `${projectCount} project${projectCount !== 1 ? 's' : ''}`,
   };
 }
 
@@ -617,16 +635,33 @@ export async function getRevenueReceived(period: TimePeriod): Promise<KPIValue> 
       AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
   `;
   
+  // Count distinct projects with revenue received in period (M1 or M2)
+  const countSql = `
+    SELECT COUNT(DISTINCT pd.\`project-dev-id\`) as project_count
+    FROM \`project-data\` pd
+    LEFT JOIN \`timeline\` t ON pd.\`project-dev-id\` = t.\`project-dev-id\`
+    WHERE (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+      AND (
+        (pd.\`m1-received-date\` IS NOT NULL AND ${dateFilter})
+        OR
+        (pd.\`m2-received-date\` IS NOT NULL AND ${dateFilter2})
+      )
+  `;
+  
   const m1Result = await queryOne<{ m1_revenue: number }>(m1Sql);
   const m2Result = await queryOne<{ m2_revenue: number }>(m2Sql);
+  const countResult = await queryOne<{ project_count: number }>(countSql);
   
   const m1Value = m1Result?.m1_revenue || 0;
   const m2Value = m2Result?.m2_revenue || 0;
   const value = m1Value + m2Value;
+  const projectCount = countResult?.project_count || 0;
   
   return {
     value,
     formatted: formatCurrency(value),
+    secondaryValue: projectCount,
+    secondaryFormatted: `${projectCount} project${projectCount !== 1 ? 's' : ''}`,
   };
 }
 

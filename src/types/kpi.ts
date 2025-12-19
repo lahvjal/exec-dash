@@ -13,6 +13,8 @@ export interface KPIValue {
   goalFormatted?: string;
   percentToGoal?: number;
   status?: KPIStatus;
+  secondaryValue?: number | string;
+  secondaryFormatted?: string;
 }
 
 export interface KPICalculationMeta {
@@ -319,7 +321,7 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
         format: "currency",
         availablePeriods: ["current_week", "previous_week", "mtd"],
         calculationMeta: {
-          calculation: "Sum of M2 (80% of contract) and M3 (20% of contract) amounts that have been submitted but not yet received, for active projects only.",
+          calculation: "Sum of M2 (80% of contract) and M3 (20% of contract) amounts that have been submitted but not yet received, for active projects only. Also displays total number of projects with outstanding A/R.",
           dataSources: [
             {
               table: "project-data",
@@ -330,8 +332,8 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
               fields: ["cancellation-reason", "project-dev-id"]
             }
           ],
-          formula: "SUM(contract-price * 0.8 WHERE m2-submitted NOT NULL AND m2-received-date IS NULL AND project-status IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')) + SUM(contract-price * 0.2 WHERE m3-submitted NOT NULL AND m3-approved IS NULL AND project-status IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals'))",
-          notes: "M2 = 80%, M3 = 20% of contract price. Only includes active project statuses. Excludes Complete, Cancelled, On Hold, Pending Cancel, and duplicate projects."
+          formula: "Amount: SUM(contract-price * 0.8 WHERE m2-submitted NOT NULL AND m2-received-date IS NULL) + SUM(contract-price * 0.2 WHERE m3-submitted NOT NULL AND m3-approved IS NULL) | Project Count: COUNT(DISTINCT project-dev-id WHERE (m2-submitted NOT NULL AND m2-received-date IS NULL) OR (m3-submitted NOT NULL AND m3-approved IS NULL))",
+          notes: "M2 = 80%, M3 = 20% of contract price. Only includes active project statuses (Active, New Lender, Finance Hold, Pre-Approvals). Excludes Complete, Cancelled, On Hold, Pending Cancel, and duplicate projects. Project count shows distinct projects with any outstanding M2 or M3."
         }
       },
       {
@@ -341,7 +343,7 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
         format: "currency",
         availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
         calculationMeta: {
-          calculation: "Total revenue received within the selected period from M1 (20%) and M2 (80%) milestone payments.",
+          calculation: "Total revenue received within the selected period from M1 (20%) and M2 (80%) milestone payments. Also displays total number of projects with payments received.",
           dataSources: [
             {
               table: "project-data",
@@ -352,8 +354,8 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
               fields: ["cancellation-reason", "project-dev-id"]
             }
           ],
-          formula: "SUM(contract-price * 0.2 WHERE m1-received-date IN [period]) + SUM(contract-price * 0.8 WHERE m2-received-date IN [period])",
-          notes: "M1 = 20%, M2 = 80% of contract price. Excludes duplicate projects."
+          formula: "Amount: SUM(contract-price * 0.2 WHERE m1-received-date IN [period]) + SUM(contract-price * 0.8 WHERE m2-received-date IN [period]) | Project Count: COUNT(DISTINCT project-dev-id WHERE (m1-received-date IN [period]) OR (m2-received-date IN [period]))",
+          notes: "M1 = 20%, M2 = 80% of contract price. Excludes duplicate projects. Project count shows distinct projects that received any M1 or M2 payment in the period."
         }
       },
       {

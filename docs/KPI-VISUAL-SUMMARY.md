@@ -34,6 +34,8 @@
 11. **Financial KPIs** (A/R, Revenue, Install M2 Not Approved) clarified to use `project-data` table for contract prices
 12. **Field name corrections**: `packet-date` (not packet-approval), `m2-approved` in `project-data` table
 13. **A/R (M2/M3)** now filters by active project statuses only (Active, New Lender, Finance Hold, Pre-Approvals) - excludes Complete, Cancelled, On Hold, Pending Cancel
+14. **A/R (M2/M3)** now displays project count alongside total dollar amount for better insight into pipeline
+15. **Revenue Received** now displays project count alongside total dollar amount to show how many projects contributed to revenue
 
 ### Database Value Analysis:
 - **8 unique project statuses** identified: Active (713), Complete (2,474), Cancelled (2,247), On Hold (286), Pending Cancel (191), Finance Hold (124), Pre-Approvals (6), New Lender (4)
@@ -191,8 +193,8 @@ Median: 55 days (middle value when sorted: 45, 55, 69)
 
 | KPI | Data Source | Calculation Type |
 |-----|-------------|------------------|
-| **A/R (M2/M3)** | `project-data.contract-price` + `project-data.m2/m3-submitted/received` | SUM M2 + M3 (active projects only) |
-| **Revenue Received** | `project-data.m1/m2-received-date` + `contract-price` | SUM by period |
+| **A/R (M2/M3)** | `project-data.contract-price` + `project-data.m2/m3-submitted/received` | SUM M2 + M3 (active projects only) + COUNT projects |
+| **Revenue Received** | `project-data.m1/m2-received-date` + `contract-price` | SUM by period + COUNT projects |
 | **Install M2 Not Approved** | `timeline.install-complete` + `project-data.m2-approved` | SUM M2 amounts |
 
 **Data Flow for A/R (M2/M3)**:
@@ -215,7 +217,20 @@ M3 Outstanding (20% of contract):
     AND pd.`project-status` IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')
     AND (t.`cancellation-reason` IS NULL OR t.`cancellation-reason` != 'Duplicate Project (Error)')
 
+Project Count:
+  SELECT COUNT(DISTINCT pd.`project-dev-id`) AS project_count
+  FROM `project-data` pd
+  LEFT JOIN timeline t ON pd.`project-dev-id` = t.`project-dev-id`
+  WHERE pd.`project-status` IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')
+    AND (t.`cancellation-reason` IS NULL OR t.`cancellation-reason` != 'Duplicate Project (Error)')
+    AND (
+      (pd.`m2-submitted` IS NOT NULL AND pd.`m2-received-date` IS NULL)
+      OR
+      (pd.`m3-submitted` IS NOT NULL AND pd.`m3-approved` IS NULL)
+    )
+
 Total A/R = M2 Outstanding + M3 Outstanding
+Displayed: Total $ Amount + Number of Projects
 
 ✅ ONLY includes active projects (Active, New Lender, Finance Hold, Pre-Approvals)
 ❌ Excludes Complete, Cancelled, On Hold, Pending Cancel
@@ -239,7 +254,20 @@ M2 Revenue (80% of contract):
     AND pd.`m2-received-date` IN [period]
     AND (t.`cancellation-reason` IS NULL OR t.`cancellation-reason` != 'Duplicate Project (Error)')
 
+Project Count:
+  SELECT COUNT(DISTINCT pd.`project-dev-id`) AS project_count
+  FROM `project-data` pd
+  LEFT JOIN timeline t ON pd.`project-dev-id` = t.`project-dev-id`
+  WHERE (t.`cancellation-reason` IS NULL OR t.`cancellation-reason` != 'Duplicate Project (Error)')
+    AND (
+      (pd.`m1-received-date` IS NOT NULL AND pd.`m1-received-date` IN [period])
+      OR
+      (pd.`m2-received-date` IS NOT NULL AND pd.`m2-received-date` IN [period])
+    )
+
 Total Revenue = M1 Revenue + M2 Revenue
+Displayed: Total $ Amount + Number of Projects
+
 → SUM of all milestone revenue received in the selected period
 ```
 
@@ -272,7 +300,12 @@ Project #104: $55,000 contract - M2 submitted, not received - Status: Complete
 Project #105: $48,000 contract - M2 submitted, not received - Status: On Hold
   ✗ Exclude (On Hold status - payment process frozen)
 
-Total A/R: $40,000 + $9,000 = $49,000
+Total A/R Amount: $40,000 + $9,000 = $49,000
+Project Count: 2 projects (Projects #101 and #102)
+
+Dashboard Display:
+  Primary: $49,000
+  Secondary: 2 projects
 ```
 
 ---
