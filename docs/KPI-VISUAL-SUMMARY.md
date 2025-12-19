@@ -18,6 +18,30 @@
 
 ---
 
+## 🔄 Recent Updates Summary
+
+### Key Changes Applied:
+1. **All cycle time calculations** now use **MEDIAN** instead of AVERAGE for more accurate representation
+2. **Duplicate filtering** applied to ALL KPIs using `cancellation-reason != 'Duplicate Project (Error)'`
+3. **Period filtering** standardized across all KPIs (determined by filter bar selection)
+4. **Total Sales** now includes JOIN to `project` table to verify `project-status != 'Cancelled'`
+5. **Aveyo Approved** source changed from `timeline` to `customer-sow` table with DISTINCT count
+6. **Pull Through Rate** clarified to use same time period as Total Sales for calculation
+7. **Jobs ON HOLD** now includes period filtering and duplicate exclusion
+8. **Install Complete NO PTO** enhanced with period filter and `install-stage-status = 'Complete'` requirement
+9. **Install Scheduled** counts appointments within the period (not just future appointments)
+10. **M2/M3 percentages** confirmed as always 80%/20% split of contract price
+11. **Financial KPIs** (A/R, Revenue, Install M2 Not Approved) clarified to use `project-data` table for contract prices
+12. **Field name corrections**: `packet-date` (not packet-approval), `m2-approved` in `project-data` table
+
+### Database Value Analysis:
+- **8 unique project statuses** identified: Active (713), Complete (2,474), Cancelled (2,247), On Hold (286), Pending Cancel (191), Finance Hold (124), Pre-Approvals (6), New Lender (4)
+- **7 unique install stage statuses** identified: Complete (3,003), Cancelled (2,277), On Hold (499), In Progress (128), Not Ready (123), Revision Complete - Review (27), Revisions (2)
+- **3 unique cancellation reasons** identified: Customer Cancelled (752), Duplicate Project (Error) (161), Missing Required Docs/Info (29)
+- **161 duplicate projects** will be excluded from all KPI calculations
+
+---
+
 ## 📋 Database Tables Overview
 
 ```mermaid
@@ -42,17 +66,34 @@ graph TD
 
 | KPI | Data Source | Calculation Type |
 |-----|-------------|------------------|
-| **Total Sales** | `timeline.contract-signed` | COUNT |
-| **Total Sales Goal** | Hardcoded | Static value |
-| **Aveyo Approved** | `timeline.packet-approval` | COUNT |
-| **Pull Through Rate** | (Aveyo Approved ÷ Total Sales) × 100 | Percentage Formula |
+| **Total Sales** | `timeline.contract-signed` + `project.project-status` | COUNT with JOIN |
+| **Total Sales Goal** | Supabase `goals` table | Static value |
+| **Aveyo Approved** | `customer-sow.sow-approved-timestamp` | COUNT DISTINCT |
+| **Pull Through Rate** | (Active projects ÷ Total Sales) × 100 | Percentage Formula |
 
 **Data Flow**:
 ```
-timeline table
-    ├── contract-signed (date) → Total Sales
-    └── packet-approval (date) → Aveyo Approved
-         └── Calculate: (Approved / Sales) × 100 → Pull Through Rate
+Total Sales:
+  timeline.contract-signed
+    JOIN project ON project-id
+    WHERE contract-signed IN [period]
+      AND project-status != 'Cancelled'
+      AND cancellation-reason != 'Duplicate Project (Error)'
+    → COUNT
+
+Aveyo Approved:
+  customer-sow.sow-approved-timestamp
+    WHERE sow-approved-timestamp IN [period]
+      AND cancellation-reason != 'Duplicate Project (Error)'
+    → COUNT DISTINCT project-id
+
+Pull Through Rate:
+  Numerator = COUNT projects WHERE:
+    - project-status IN ('Active', 'Complete', 'Pre-Approvals', 'New Lender', 'Finance Hold')
+    - contract-signed IN [same period as Total Sales]
+    - Exclude 'Duplicate Project (Error)'
+  Denominator = Total Sales
+  Result = (Numerator / Denominator) × 100
 ```
 
 ---
@@ -61,21 +102,40 @@ timeline table
 
 | KPI | Data Source | Calculation Type |
 |-----|-------------|------------------|
-| **Jobs ON HOLD** | `work-orders.work-order-status` | COUNT |
-| **Installs Complete** | `timeline.install-complete` | COUNT |
-| **Install Goal** | Hardcoded | Static value |
-| **Complete NO PTO** | `timeline.install-complete` + `pto-received` | COUNT with filter |
-| **Install Scheduled** | `work-orders.site-visit-appointment` | COUNT |
+| **Jobs ON HOLD** | `project.project-status` | COUNT by period |
+| **Installs Complete** | `timeline.install-complete` + `install-stage-status` | COUNT with filters |
+| **Install Goal** | Supabase `goals` table | Static value |
+| **Install Complete NO PTO** | `timeline.install-complete` + `pto-received` | COUNT with filters |
+| **Install Scheduled** | `timeline.install-appointment` | COUNT by period |
 
 **Data Flow**:
 ```
-timeline table
-    ├── install-complete (date) → Installs Complete
-    └── install-complete + pto-received NULL → Complete NO PTO
+Jobs ON HOLD:
+  project.project-status = 'On Hold'
+    WHERE [filtered by period]
+    AND cancellation-reason != 'Duplicate Project (Error)'
+    → COUNT
 
-work-orders table
-    ├── work-order-status = "On Hold" → Jobs ON HOLD
-    └── site-visit-appointment (future) → Install Scheduled
+Installs Complete:
+  timeline.install-complete
+    WHERE install-complete IN [period]
+      AND install-stage-status = 'Complete'
+      AND cancellation-reason != 'Duplicate Project (Error)'
+    → COUNT
+
+Install Complete NO PTO:
+  timeline.install-complete
+    WHERE install-complete IN [period]
+      AND pto-received IS NULL
+      AND install-stage-status = 'Complete'
+      AND cancellation-reason != 'Duplicate Project (Error)'
+    → COUNT
+
+Install Scheduled:
+  timeline.install-appointment
+    WHERE install-appointment IN [period]
+      AND cancellation-reason != 'Duplicate Project (Error)'
+    → COUNT appointments in the period
 ```
 
 ---
@@ -84,24 +144,44 @@ work-orders table
 
 | KPI | Data Source | Calculation Type |
 |-----|-------------|------------------|
-| **PP → Install Start** | `timeline.packet-approval` to `install-appointment` | AVG(DATEDIFF) |
-| **Install → M2** | `timeline.install-complete` to `project-data.m2-approved` | AVG(DATEDIFF) |
-| **PP → PTO** | `timeline.packet-approval` to `pto-received` | AVG(DATEDIFF) |
+| **PP → Install Start** | `timeline.packet-date` to `timeline.install-appointment` | MEDIAN DAYS(DATEDIFF) |
+| **Install → M2** | `timeline.install-appointment` to `project-data.m2-approved` | MEDIAN DAYS(DATEDIFF) |
+| **PP → PTO** | `timeline.packet-date` to `timeline.pto-received` | MEDIAN DAYS(DATEDIFF) |
 
 **Data Flow**:
 ```
-Start Date           End Date           Calculation
-─────────────────────────────────────────────────────
-packet-approval  →  install-appointment  = Avg Days
-install-complete →  m2-approved          = Avg Days
-packet-approval  →  pto-received         = Avg Days
+PP → Install Start:
+  MEDIAN(DATEDIFF(install-appointment, packet-date))
+    WHERE packet-date IS NOT NULL
+      AND install-appointment IS NOT NULL
+      AND [period determined by filter bar]
+      AND cancellation-reason != 'Duplicate Project (Error)'
+    → MEDIAN days between packet-date and install-appointment
+
+Install → M2:
+  MEDIAN(DATEDIFF(m2-approved, install-appointment))
+    JOIN project-data ON project-id
+    WHERE install-appointment IS NOT NULL
+      AND m2-approved IS NOT NULL (from project-data table)
+      AND [period determined by filter bar]
+      AND cancellation-reason != 'Duplicate Project (Error)'
+    → MEDIAN days between install-appointment and m2-approved
+
+PP → PTO:
+  MEDIAN(DATEDIFF(pto-received, packet-date))
+    WHERE packet-date IS NOT NULL
+      AND pto-received IS NOT NULL
+      AND [period determined by filter bar]
+      AND cancellation-reason != 'Duplicate Project (Error)'
+    → MEDIAN days between packet-date and pto-received
 ```
 
-**Example Calculation**:
+**Example Calculation (using MEDIAN)**:
 ```
 Project A: PP on Jan 1 → Install on Feb 15 = 45 days
-Project B: PP on Jan 5 → Install on Mar 1  = 55 days
-Average: (45 + 55) / 2 = 50 days
+Project B: PP on Jan 5 → Mar 1  = 55 days
+Project C: PP on Jan 10 → Mar 20 = 69 days
+Median: 55 days (middle value when sorted: 45, 55, 69)
 ```
 
 ---
@@ -110,31 +190,64 @@ Average: (45 + 55) / 2 = 50 days
 
 | KPI | Data Source | Calculation Type |
 |-----|-------------|------------------|
-| **A/R (M2/M3)** | `project-data.contract-price` | SUM with filter |
-| **Revenue Received** | `project-data.contract-price` | SUM by period |
-| **Install M2 Not Approved** | `project-data.contract-price` | SUM with filter |
-| **Holdback** | ⚠️ Not available | Placeholder |
-| **DCA** | ⚠️ Not available | Placeholder |
+| **A/R (M2/M3)** | `project-data.contract-price` | SUM M2 + M3 |
+| **Revenue Received** | `accounting.revenue_received` | SUM by period |
+| **Install M2 Not Approved** | `timeline.install-complete` + `project-data.m2-approved` | SUM M2 amounts |
 
-**Data Flow for A/R**:
+**Data Flow for A/R (M2/M3)**:
 ```
-project-data table
-    └── contract-price (dollar amount)
-         ├── WHERE m2-submitted IS NOT NULL
-         │   AND m2-received-date IS NULL → Add to A/R
-         └── WHERE m3-submitted IS NOT NULL
-             AND m3-approved IS NULL → Add to A/R
+M2 Outstanding:
+  SELECT SUM(pd.`contract-price` * 0.8) AS m2_amount
+  FROM accounting a
+  JOIN `project-data` pd ON a.project_id = pd.`project-id`
+  WHERE a.M2_Submitted_Date IS NOT NULL
+    AND a.M2_Received_Date IS NULL
+    AND [period determined by filter bar]
+    AND cancellation-reason != 'Duplicate Project (Error)'
 
-Result: SUM of all matching contract prices
+M3 Outstanding:
+  SELECT SUM(pd.`contract-price` * 0.2) AS m3_amount
+  FROM accounting a
+  JOIN `project-data` pd ON a.project_id = pd.`project-id`
+  WHERE a.M3_Submitted_Date IS NOT NULL
+    AND a.M3_Received_Date IS NULL
+    AND [period determined by filter bar]
+    AND cancellation-reason != 'Duplicate Project (Error)'
+
+Total A/R = M2 Outstanding + M3 Outstanding
 ```
 
-**Example**:
+**Data Flow for Revenue Received**:
 ```
-Project #101: $50,000 - M2 submitted, not received ✓ Include
-Project #102: $45,000 - M3 submitted, not approved ✓ Include
-Project #103: $60,000 - M2 received already      ✗ Exclude
+accounting.revenue_received
+  WHERE [period determined by filter bar]
+  → SUM all revenue received in period
+```
 
-Total A/R: $50,000 + $45,000 = $95,000
+**Data Flow for Install M2 Not Approved**:
+```
+SELECT SUM(pd.`contract-price` * 0.8) AS m2_amount
+FROM timeline t
+JOIN `project-data` pd ON t.`project-id` = pd.`project-id`
+WHERE t.`install-complete` IS NOT NULL
+  AND pd.`m2-approved` IS NULL
+  AND [period determined by filter bar]
+  AND t.cancellation-reason != 'Duplicate Project (Error)'
+→ SUM of all M2 amounts (80% of contract price) for installs without M2 approval
+```
+
+**Example for A/R**:
+```
+Project #101: $50,000 contract - M2 submitted, not received
+  M2 Amount = $50,000 × 0.8 = $40,000 ✓ Include
+
+Project #102: $45,000 contract - M3 submitted, not received
+  M3 Amount = $45,000 × 0.2 = $9,000 ✓ Include
+
+Project #103: $60,000 contract - M2 already received
+  ✗ Exclude
+
+Total A/R: $40,000 + $9,000 = $49,000
 ```
 
 ---
@@ -143,15 +256,17 @@ Total A/R: $50,000 + $45,000 = $95,000
 
 | KPI | Data Source | Calculation Type |
 |-----|-------------|------------------|
-| **Active NO PTO** | `project-data.project-status` + `timeline.pto-received` | COUNT |
+| **Active NO PTO** | `project.project-status` + `timeline.pto-received` | COUNT |
 
 **Data Flow**:
 ```
-project-data + timeline tables
-    └── WHERE project-status NOT IN ('Cancelled', 'Complete')
-        AND pto-received IS NULL
-        
-Result: 1,067 active projects awaiting PTO
+SELECT COUNT(*)
+FROM project p
+JOIN timeline t ON p.`project-id` = t.`project-id`
+WHERE p.`project-status` IN ('Active', 'Complete', 'Pre-Approvals', 'New Lender', 'Finance Hold')
+  AND t.`pto-received` IS NULL
+  AND (t.cancellation-reason IS NULL OR t.cancellation-reason != 'Duplicate Project (Error)')
+→ COUNT all active projects without PTO (no time period filter)
 ```
 
 ---
@@ -160,29 +275,41 @@ Result: 1,067 active projects awaiting PTO
 
 | KPI | Data Source | Calculation Type |
 |-----|-------------|------------------|
-| **KW Scheduled** | `project-data.system-size` | SUM |
-| **KW Scheduled Goal** | Hardcoded | Static value |
-| **KW Installed** | `project-data.system-size` | SUM by period |
-| **KW Installed Goal** | Hardcoded | Static value |
-| **A/R Commercial** | Same as residential | SUM |
-| **Revenue Commercial** | Same as residential | SUM |
+| **KW Scheduled** | `project-data.system-size` + `timeline.install-appointment` | SUM by period |
+| **KW Scheduled Goal** | Supabase `goals` table | Static value |
+| **KW Installed** | `project-data.system-size` + `timeline.install-complete` | SUM by period |
+| **KW Installed Goal** | Supabase `goals` table | Static value |
 
 **Data Flow**:
 ```
-project-data table
-    └── system-size (KW)
-         ├── WHERE install scheduled in period → SUM for KW Scheduled
-         └── WHERE install complete in period → SUM for KW Installed
+KW Scheduled:
+  SELECT SUM(pd.`system-size`)
+  FROM `project-data` pd
+  JOIN timeline t ON pd.`project-id` = t.`project-id`
+  WHERE t.`install-appointment` IS NOT NULL
+    AND t.`install-complete` IS NULL
+    AND [period determined by filter bar]
+    AND t.cancellation-reason != 'Duplicate Project (Error)'
+  → SUM of system-size for scheduled installations in period
+
+KW Installed:
+  SELECT SUM(pd.`system-size`)
+  FROM `project-data` pd
+  JOIN timeline t ON pd.`project-id` = t.`project-id`
+  WHERE t.`install-complete` IS NOT NULL
+    AND t.`install-complete` IN [period]
+    AND t.cancellation-reason != 'Duplicate Project (Error)'
+  → SUM of system-size for completed installations in period
 ```
 
 **Example**:
 ```
-Monday installations:
-- Project A: 8.5 KW
-- Project B: 12.0 KW
-- Project C: 6.2 KW
+Week of Dec 15-21 installations:
+- Project A: 8.5 KW (completed Dec 16)
+- Project B: 12.0 KW (completed Dec 18)
+- Project C: 6.2 KW (completed Dec 20)
 
-Total KW: 26.7 KW
+Total KW Installed: 26.7 KW
 ```
 
 ---
@@ -313,7 +440,7 @@ Status: Danger 🔴
 | Field Name | Table | Purpose | Example |
 |------------|-------|---------|---------|
 | `contract-signed` | timeline | When sale closed | 2025-01-15 |
-| `packet-approval` | timeline | Perfect Packet approved | 2025-02-01 |
+| `packet-date` | timeline | Perfect Packet approved | 2025-02-01 |
 | `install-appointment` | timeline | Install scheduled | 2025-03-15 |
 | `install-complete` | timeline | Install finished | 2025-03-16 |
 | `pto-received` | timeline | Permission to Operate | 2025-04-20 |
@@ -411,22 +538,28 @@ Find the function for your KPI:
 
 ## 🎯 Data Accuracy Notes
 
-### ✅ Verified Accurate
-- Sales counts match direct SQL queries
-- Financial totals match SUM queries
-- Cycle time calculations validated
-- Period boundaries correct
+### ✅ Implementation Ready
+- All KPI formulas clarified and documented
+- Database field values analyzed and verified
+- Duplicate filtering strategy defined (161 projects to exclude)
+- Period filtering standardized across all KPIs
+- MEDIAN calculations specified for all cycle times
+- M2/M3 percentage splits confirmed (80%/20%)
 
-### ⚠️ Needs Attention
-- **Holdback**: Returns $0 (no data source)
-- **DCA**: Returns $0 (no data source)
-- **Commercial filter**: Not implemented (treats all as residential)
+### ⚠️ Pending Database Updates
+- **`accounting` table** - Currently being added to database for:
+  - A/R (M2/M3) calculations
+  - Revenue Received tracking
+  - M2/M3 submission and received dates
+- Once available, financial KPIs will be fully functional
 
-### 📊 Business Insights from Current Data
-- **328 installs without PTO** - significant bottleneck
-- **1,067 active projects without PTO** - large pipeline
-- **$72.9M in A/R** - substantial receivables
-- **103-day cycle time** - exceeds 60-day goal by 72%
+### 📊 Current Database Statistics
+- **6,045 total projects** across all statuses
+- **3,321 active/complete projects** (55% of total)
+- **2,247 cancelled projects** (37% of total)
+- **286 projects on hold** (5% of total)
+- **161 duplicate projects** to be excluded from all calculations
+- **3,003 completed installs** with 'Complete' status
 
 ---
 

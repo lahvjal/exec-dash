@@ -249,3 +249,4 @@ The header now features the official Aveyo logo, providing:
 **Status**: ✅ Complete  
 **Next.js Version**: 14.2.15  
 **Logo Format**: SVG (Optimized)
+

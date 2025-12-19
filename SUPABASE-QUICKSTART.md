@@ -257,3 +257,5 @@ See `docs/SUPABASE-SETUP.md` for detailed documentation including:
 **All set! Your dashboard now uses Supabase for authentication and goal storage.** 🚀
 
 Questions? Check `docs/SUPABASE-SETUP.md` for detailed help.
+
+

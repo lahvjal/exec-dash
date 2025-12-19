@@ -65,6 +65,7 @@ export function KPISection({ section, period, kpiData, className }: KPISectionPr
                 data={data}
                 isHighlighted={kpi.isHighlighted}
                 showGoal={kpi.showGoal}
+                calculationMeta={kpi.calculationMeta}
               />
             </div>
           );

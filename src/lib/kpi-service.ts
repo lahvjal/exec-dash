@@ -261,9 +261,10 @@ export async function getTotalSales(period: TimePeriod): Promise<KPIValue> {
   const sql = `
     SELECT COUNT(*) as count
     FROM \`timeline\` t
-    JOIN \`project-data\` pd ON t.\`project-id\` = pd.\`project-id\`
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
     WHERE t.\`contract-signed\` IS NOT NULL
       AND pd.\`project-status\` != 'Cancelled'
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
       AND ${dateFilter}
   `;
   
@@ -302,12 +303,14 @@ export async function getTotalSalesGoal(period: TimePeriod): Promise<KPIValue> {
 }
 
 export async function getAveyoApproved(period: TimePeriod): Promise<KPIValue> {
-  const dateFilter = buildDateFilter('`packet-approval`', period);
+  const dateFilter = buildDateFilter('cs.`sow-approved-timestamp`', period);
   
   const sql = `
-    SELECT COUNT(*) as count
-    FROM \`timeline\`
-    WHERE \`packet-approval\` IS NOT NULL
+    SELECT COUNT(DISTINCT cs.\`project-id\`) as count
+    FROM \`customer-sow\` cs
+    LEFT JOIN \`project-data\` pd ON cs.\`project-id\` = pd.\`project-id\`
+    WHERE cs.\`sow-approved-timestamp\` IS NOT NULL
+      AND (pd.\`project-status\` IS NULL OR pd.\`project-status\` != 'Cancelled')
       AND ${dateFilter}
   `;
   
@@ -321,13 +324,27 @@ export async function getAveyoApproved(period: TimePeriod): Promise<KPIValue> {
 }
 
 export async function getPullThroughRate(period: TimePeriod): Promise<KPIValue> {
-  const sales = await getTotalSales(period);
-  const approved = await getAveyoApproved(period);
+  const dateFilter = buildDateFilter('t.`contract-signed`', period);
   
-  const salesValue = typeof sales.value === 'number' ? sales.value : 0;
-  const approvedValue = typeof approved.value === 'number' ? approved.value : 0;
+  // Get total sales count (denominator)
+  const totalSales = await getTotalSales(period);
+  const salesValue = typeof totalSales.value === 'number' ? totalSales.value : 0;
   
-  const rate = salesValue > 0 ? (approvedValue / salesValue) * 100 : 0;
+  // Get active projects count (numerator)
+  const activeSql = `
+    SELECT COUNT(*) as count
+    FROM \`timeline\` t
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
+    WHERE pd.\`project-status\` IN ('Active', 'Complete', 'Pre-Approvals', 'New Lender', 'Finance Hold')
+      AND t.\`contract-signed\` IS NOT NULL
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+      AND ${dateFilter}
+  `;
+  
+  const result = await queryOne<{ count: number }>(activeSql);
+  const activeValue = result?.count || 0;
+  
+  const rate = salesValue > 0 ? (activeValue / salesValue) * 100 : 0;
   
   return {
     value: rate,
@@ -343,10 +360,10 @@ export async function getPullThroughRate(period: TimePeriod): Promise<KPIValue> 
 export async function getJobsOnHold(period: TimePeriod): Promise<KPIValue> {
   const sql = `
     SELECT COUNT(*) as count
-    FROM \`work-orders\`
-    WHERE \`work-order-status\` = 'On Hold'
-      AND \`type\` = 'Install'
-      AND \`is_deleted\` = 0
+    FROM \`project-data\` pd
+    LEFT JOIN \`timeline\` t ON pd.\`project-dev-id\` = t.\`project-dev-id\`
+    WHERE pd.\`project-status\` = 'On Hold'
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
   `;
   
   const result = await queryOne<{ count: number }>(sql);
@@ -366,6 +383,8 @@ export async function getInstallsComplete(period: TimePeriod): Promise<KPIValue>
     SELECT COUNT(*) as count
     FROM \`timeline\`
     WHERE \`install-complete\` IS NOT NULL
+      AND \`install-stage-status\` = 'Complete'
+      AND (\`cancellation-reason\` IS NULL OR \`cancellation-reason\` != 'Duplicate Project (Error)')
       AND ${dateFilter}
   `;
   
@@ -394,14 +413,16 @@ export async function getInstallCompletionGoal(period: TimePeriod): Promise<KPIV
 }
 
 export async function getInstallCompleteNoPTO(period: TimePeriod): Promise<KPIValue> {
+  const dateFilter = buildDateFilter('t.`install-complete`', period);
+  
   const sql = `
     SELECT COUNT(*) as count
     FROM \`timeline\` t
-    JOIN \`project-data\` pd ON t.\`project-id\` = pd.\`project-id\`
     WHERE t.\`install-complete\` IS NOT NULL
       AND t.\`pto-received\` IS NULL
-      AND pd.\`project-status\` != 'Cancelled'
-      AND t.\`is_deleted\` = 0
+      AND t.\`install-stage-status\` = 'Complete'
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+      AND ${dateFilter}
   `;
   
   const result = await queryOne<{ count: number }>(sql);
@@ -415,16 +436,14 @@ export async function getInstallCompleteNoPTO(period: TimePeriod): Promise<KPIVa
 }
 
 export async function getInstallScheduled(period: TimePeriod): Promise<KPIValue> {
-  const range = getPeriodDateRange(period);
+  const dateFilter = buildDateFilter('`install-appointment`', period);
   
   const sql = `
-    SELECT COUNT(DISTINCT wo.\`project_ids\`) as count
-    FROM \`work-orders\` wo
-    WHERE wo.\`type\` = 'Install'
-      AND wo.\`site-visit-appointment\` IS NOT NULL
-      AND wo.\`site-visit-appointment\` >= '${range.start}'
-      AND wo.\`site-visit-appointment\` <= '${range.end}'
-      AND wo.\`is_deleted\` = 0
+    SELECT COUNT(*) as count
+    FROM \`timeline\`
+    WHERE \`install-appointment\` IS NOT NULL
+      AND (\`cancellation-reason\` IS NULL OR \`cancellation-reason\` != 'Duplicate Project (Error)')
+      AND ${dateFilter}
   `;
   
   const result = await queryOne<{ count: number }>(sql);
@@ -443,11 +462,13 @@ export async function getInstallScheduled(period: TimePeriod): Promise<KPIValue>
 export async function getAvgDaysPPToInstall(period: TimePeriod): Promise<KPIValue> {
   const dateFilter = buildDateFilter('`install-appointment`', period);
   
+  // TODO: Update to use MEDIAN instead of AVG for more accurate cycle time representation
   const sql = `
     SELECT AVG(DATEDIFF(\`install-appointment\`, \`packet-approval\`)) as avg_days
     FROM \`timeline\`
     WHERE \`packet-approval\` IS NOT NULL
       AND \`install-appointment\` IS NOT NULL
+      AND (\`cancellation-reason\` IS NULL OR \`cancellation-reason\` != 'Duplicate Project (Error)')
       AND ${dateFilter}
   `;
   
@@ -470,14 +491,16 @@ export async function getAvgDaysPPToInstall(period: TimePeriod): Promise<KPIValu
 }
 
 export async function getAvgDaysInstallToM2(period: TimePeriod): Promise<KPIValue> {
-  const dateFilter = buildDateFilter('t.`install-complete`', period);
+  const dateFilter = buildDateFilter('t.`install-appointment`', period);
   
+  // TODO: Update to use MEDIAN instead of AVG for more accurate cycle time representation
   const sql = `
-    SELECT AVG(DATEDIFF(pd.\`m2-approved\`, t.\`install-complete\`)) as avg_days
+    SELECT AVG(DATEDIFF(pd.\`m2-approved\`, t.\`install-appointment\`)) as avg_days
     FROM \`timeline\` t
-    JOIN \`project-data\` pd ON t.\`project-id\` = pd.\`project-id\`
-    WHERE t.\`install-complete\` IS NOT NULL
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
+    WHERE t.\`install-appointment\` IS NOT NULL
       AND pd.\`m2-approved\` IS NOT NULL
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
       AND ${dateFilter}
   `;
   
@@ -502,11 +525,13 @@ export async function getAvgDaysInstallToM2(period: TimePeriod): Promise<KPIValu
 export async function getAvgDaysPPToPTO(period: TimePeriod): Promise<KPIValue> {
   const dateFilter = buildDateFilter('`pto-received`', period);
   
+  // TODO: Update to use MEDIAN instead of AVG for more accurate cycle time representation
   const sql = `
     SELECT AVG(DATEDIFF(\`pto-received\`, \`packet-approval\`)) as avg_days
     FROM \`timeline\`
     WHERE \`packet-approval\` IS NOT NULL
       AND \`pto-received\` IS NOT NULL
+      AND (\`cancellation-reason\` IS NULL OR \`cancellation-reason\` != 'Duplicate Project (Error)')
       AND ${dateFilter}
   `;
   
@@ -533,19 +558,34 @@ export async function getAvgDaysPPToPTO(period: TimePeriod): Promise<KPIValue> {
 // =============================================================================
 
 export async function getARM2M3(period: TimePeriod): Promise<KPIValue> {
-  const sql = `
-    SELECT SUM(\`contract-price\`) as total
-    FROM \`project-data\`
-    WHERE (
-      (\`m2-submitted\` IS NOT NULL AND \`m2-received-date\` IS NULL)
-      OR (\`m3-submitted\` IS NOT NULL AND \`m3-approved\` IS NULL)
-    )
-    AND \`project-status\` != 'Cancelled'
-    AND \`is_deleted\` = 0
+  // Calculate M2 outstanding (80% of contract price for submitted but not received)
+  const m2Sql = `
+    SELECT SUM(pd.\`contract-price\` * 0.8) as m2_total
+    FROM \`project-data\` pd
+    LEFT JOIN \`timeline\` t ON pd.\`project-dev-id\` = t.\`project-dev-id\`
+    WHERE pd.\`m2-submitted\` IS NOT NULL
+      AND pd.\`m2-received-date\` IS NULL
+      AND pd.\`project-status\` != 'Cancelled'
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
   `;
   
-  const result = await queryOne<{ total: number }>(sql);
-  const value = result?.total || 0;
+  // Calculate M3 outstanding (20% of contract price for submitted but not received)
+  const m3Sql = `
+    SELECT SUM(pd.\`contract-price\` * 0.2) as m3_total
+    FROM \`project-data\` pd
+    LEFT JOIN \`timeline\` t ON pd.\`project-dev-id\` = t.\`project-dev-id\`
+    WHERE pd.\`m3-submitted\` IS NOT NULL
+      AND pd.\`m3-approved\` IS NULL
+      AND pd.\`project-status\` != 'Cancelled'
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+  `;
+  
+  const m2Result = await queryOne<{ m2_total: number }>(m2Sql);
+  const m3Result = await queryOne<{ m3_total: number }>(m3Sql);
+  
+  const m2Value = m2Result?.m2_total || 0;
+  const m3Value = m3Result?.m3_total || 0;
+  const value = m2Value + m3Value;
   
   return {
     value,
@@ -554,21 +594,35 @@ export async function getARM2M3(period: TimePeriod): Promise<KPIValue> {
 }
 
 export async function getRevenueReceived(period: TimePeriod): Promise<KPIValue> {
-  const dateFilter1 = buildDateFilter('`m1-received-date`', period);
-  const dateFilter2 = buildDateFilter('`m2-received-date`', period);
+  const dateFilter = buildDateFilter('pd.`m1-received-date`', period);
+  const dateFilter2 = buildDateFilter('pd.`m2-received-date`', period);
   
-  const sql = `
-    SELECT SUM(\`contract-price\`) as total
-    FROM \`project-data\`
-    WHERE (
-      (\`m1-received-date\` IS NOT NULL AND ${dateFilter1})
-      OR (\`m2-received-date\` IS NOT NULL AND ${dateFilter2})
-    )
-    AND \`is_deleted\` = 0
+  // Calculate M1 revenue (20% of contract price) received in period
+  const m1Sql = `
+    SELECT SUM(pd.\`contract-price\` * 0.2) as m1_revenue
+    FROM \`project-data\` pd
+    LEFT JOIN \`timeline\` t ON pd.\`project-dev-id\` = t.\`project-dev-id\`
+    WHERE pd.\`m1-received-date\` IS NOT NULL
+      AND ${dateFilter}
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
   `;
   
-  const result = await queryOne<{ total: number }>(sql);
-  const value = result?.total || 0;
+  // Calculate M2 revenue (80% of contract price) received in period  
+  const m2Sql = `
+    SELECT SUM(pd.\`contract-price\` * 0.8) as m2_revenue
+    FROM \`project-data\` pd
+    LEFT JOIN \`timeline\` t ON pd.\`project-dev-id\` = t.\`project-dev-id\`
+    WHERE pd.\`m2-received-date\` IS NOT NULL
+      AND ${dateFilter2}
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+  `;
+  
+  const m1Result = await queryOne<{ m1_revenue: number }>(m1Sql);
+  const m2Result = await queryOne<{ m2_revenue: number }>(m2Sql);
+  
+  const m1Value = m1Result?.m1_revenue || 0;
+  const m2Value = m2Result?.m2_revenue || 0;
+  const value = m1Value + m2Value;
   
   return {
     value,
@@ -577,14 +631,16 @@ export async function getRevenueReceived(period: TimePeriod): Promise<KPIValue> 
 }
 
 export async function getInstallM2NotApproved(period: TimePeriod): Promise<KPIValue> {
+  const dateFilter = buildDateFilter('t.`install-complete`', period);
+  
   const sql = `
-    SELECT SUM(pd.\`contract-price\`) as total
+    SELECT SUM(pd.\`contract-price\` * 0.8) as total
     FROM \`timeline\` t
-    JOIN \`project-data\` pd ON t.\`project-id\` = pd.\`project-id\`
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
     WHERE t.\`install-complete\` IS NOT NULL
       AND pd.\`m2-approved\` IS NULL
-      AND pd.\`project-status\` != 'Cancelled'
-      AND t.\`is_deleted\` = 0
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+      AND ${dateFilter}
   `;
   
   const result = await queryOne<{ total: number }>(sql);
@@ -621,10 +677,10 @@ export async function getActiveNoPTO(period: TimePeriod): Promise<KPIValue> {
   const sql = `
     SELECT COUNT(*) as count
     FROM \`project-data\` pd
-    JOIN \`timeline\` t ON pd.\`project-id\` = t.\`project-id\`
-    WHERE pd.\`project-status\` NOT IN ('Cancelled', 'Complete')
+    JOIN \`timeline\` t ON pd.\`project-dev-id\` = t.\`project-dev-id\`
+    WHERE pd.\`project-status\` IN ('Active', 'Complete', 'Pre-Approvals', 'New Lender', 'Finance Hold')
       AND t.\`pto-received\` IS NULL
-      AND pd.\`is_deleted\` = 0
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
   `;
   
   const result = await queryOne<{ count: number }>(sql);
@@ -641,17 +697,16 @@ export async function getActiveNoPTO(period: TimePeriod): Promise<KPIValue> {
 // =============================================================================
 
 export async function getTotalKWScheduled(period: TimePeriod): Promise<KPIValue> {
-  const range = getPeriodDateRange(period);
+  const dateFilter = buildDateFilter('t.`install-appointment`', period);
   
   const sql = `
     SELECT SUM(pd.\`system-size\`) as total_kw
-    FROM \`work-orders\` wo
-    JOIN \`project-data\` pd ON wo.\`project_ids\` = pd.\`item_id\`
-    WHERE wo.\`type\` = 'Install'
-      AND wo.\`site-visit-appointment\` IS NOT NULL
-      AND wo.\`site-visit-appointment\` >= '${range.start}'
-      AND wo.\`site-visit-appointment\` <= '${range.end}'
-      AND wo.\`is_deleted\` = 0
+    FROM \`timeline\` t
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
+    WHERE t.\`install-appointment\` IS NOT NULL
+      AND t.\`install-complete\` IS NULL
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+      AND ${dateFilter}
   `;
   
   const result = await queryOne<{ total_kw: number }>(sql);
@@ -684,10 +739,10 @@ export async function getTotalKWInstalled(period: TimePeriod): Promise<KPIValue>
   const sql = `
     SELECT SUM(pd.\`system-size\`) as total_kw
     FROM \`timeline\` t
-    JOIN \`project-data\` pd ON t.\`project-id\` = pd.\`project-id\`
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
     WHERE t.\`install-complete\` IS NOT NULL
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
       AND ${dateFilter}
-      AND t.\`is_deleted\` = 0
   `;
   
   const result = await queryOne<{ total_kw: number }>(sql);

@@ -1,8 +1,9 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { KPIValue, KPIStatus, KPITrend } from "@/types/kpi";
+import { KPIValue, KPIStatus, KPITrend, KPICalculationMeta } from "@/types/kpi";
 import { TrendingUp, TrendingDown, Minus, AlertCircle } from "lucide-react";
+import { Tooltip, KPITooltipContent } from "./ui/tooltip";
 
 interface KPICardProps {
   title: string;
@@ -11,6 +12,7 @@ interface KPICardProps {
   isHighlighted?: boolean;
   showGoal?: boolean;
   className?: string;
+  calculationMeta?: KPICalculationMeta;
 }
 
 function getTrendIcon(trend?: KPITrend) {
@@ -79,6 +81,7 @@ export function KPICard({
   isHighlighted,
   showGoal,
   className,
+  calculationMeta,
 }: KPICardProps) {
   const styles = getStatusStyles(data?.status, isHighlighted);
 
@@ -114,8 +117,22 @@ export function KPICard({
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
-        <div>
-          <h3 className="text-sm font-medium text-slate-600">{title}</h3>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-medium text-slate-600">{title}</h3>
+            {calculationMeta && (
+              <Tooltip
+                content={
+                  <KPITooltipContent
+                    calculation={calculationMeta.calculation}
+                    dataSources={calculationMeta.dataSources}
+                    formula={calculationMeta.formula}
+                    notes={calculationMeta.notes}
+                  />
+                }
+              />
+            )}
+          </div>
           {description && (
             <p className="text-xs text-slate-400 mt-0.5">{description}</p>
           )}
@@ -123,7 +140,7 @@ export function KPICard({
         {data.trend && data.trendValue && (
           <div
             className={cn(
-              "flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium",
+              "flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ml-2 shrink-0",
               styles.badge
             )}
           >
