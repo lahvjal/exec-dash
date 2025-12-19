@@ -319,19 +319,19 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
         format: "currency",
         availablePeriods: ["current_week", "previous_week", "mtd"],
         calculationMeta: {
-          calculation: "Sum of M2 (80% of contract) and M3 (20% of contract) amounts that have been submitted but not yet received.",
+          calculation: "Sum of M2 (80% of contract) and M3 (20% of contract) amounts that have been submitted but not yet received, for active projects only.",
           dataSources: [
             {
               table: "project-data",
-              fields: ["m2-submitted", "m2-received-date", "m3-submitted", "m3-approved", "contract-price", "project-dev-id"]
+              fields: ["m2-submitted", "m2-received-date", "m3-submitted", "m3-approved", "contract-price", "project-status", "project-dev-id"]
             },
             {
               table: "timeline",
               fields: ["cancellation-reason", "project-dev-id"]
             }
           ],
-          formula: "SUM(contract-price * 0.8 WHERE m2-submitted NOT NULL AND m2-received-date IS NULL) + SUM(contract-price * 0.2 WHERE m3-submitted NOT NULL AND m3-approved IS NULL)",
-          notes: "M2 = 80%, M3 = 20% of contract price. Excludes cancelled and duplicate projects."
+          formula: "SUM(contract-price * 0.8 WHERE m2-submitted NOT NULL AND m2-received-date IS NULL AND project-status IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')) + SUM(contract-price * 0.2 WHERE m3-submitted NOT NULL AND m3-approved IS NULL AND project-status IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals'))",
+          notes: "M2 = 80%, M3 = 20% of contract price. Only includes active project statuses. Excludes Complete, Cancelled, On Hold, Pending Cancel, and duplicate projects."
         }
       },
       {

@@ -33,6 +33,7 @@
 10. **M2/M3 percentages** confirmed as always 80%/20% split of contract price
 11. **Financial KPIs** (A/R, Revenue, Install M2 Not Approved) clarified to use `project-data` table for contract prices
 12. **Field name corrections**: `packet-date` (not packet-approval), `m2-approved` in `project-data` table
+13. **A/R (M2/M3)** now filters by active project statuses only (Active, New Lender, Finance Hold, Pre-Approvals) - excludes Complete, Cancelled, On Hold, Pending Cancel
 
 ### Database Value Analysis:
 - **8 unique project statuses** identified: Active (713), Complete (2,474), Cancelled (2,247), On Hold (286), Pending Cancel (191), Finance Hold (124), Pre-Approvals (6), New Lender (4)
@@ -190,45 +191,63 @@ Median: 55 days (middle value when sorted: 45, 55, 69)
 
 | KPI | Data Source | Calculation Type |
 |-----|-------------|------------------|
-| **A/R (M2/M3)** | `project-data.contract-price` | SUM M2 + M3 |
-| **Revenue Received** | `accounting.revenue_received` | SUM by period |
+| **A/R (M2/M3)** | `project-data.contract-price` + `project-data.m2/m3-submitted/received` | SUM M2 + M3 (active projects only) |
+| **Revenue Received** | `project-data.m1/m2-received-date` + `contract-price` | SUM by period |
 | **Install M2 Not Approved** | `timeline.install-complete` + `project-data.m2-approved` | SUM M2 amounts |
 
 **Data Flow for A/R (M2/M3)**:
 ```
-M2 Outstanding:
+M2 Outstanding (80% of contract):
   SELECT SUM(pd.`contract-price` * 0.8) AS m2_amount
-  FROM accounting a
-  JOIN `project-data` pd ON a.project_id = pd.`project-id`
-  WHERE a.M2_Submitted_Date IS NOT NULL
-    AND a.M2_Received_Date IS NULL
-    AND [period determined by filter bar]
-    AND cancellation-reason != 'Duplicate Project (Error)'
+  FROM `project-data` pd
+  LEFT JOIN timeline t ON pd.`project-dev-id` = t.`project-dev-id`
+  WHERE pd.`m2-submitted` IS NOT NULL
+    AND pd.`m2-received-date` IS NULL
+    AND pd.`project-status` IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')
+    AND (t.`cancellation-reason` IS NULL OR t.`cancellation-reason` != 'Duplicate Project (Error)')
 
-M3 Outstanding:
+M3 Outstanding (20% of contract):
   SELECT SUM(pd.`contract-price` * 0.2) AS m3_amount
-  FROM accounting a
-  JOIN `project-data` pd ON a.project_id = pd.`project-id`
-  WHERE a.M3_Submitted_Date IS NOT NULL
-    AND a.M3_Received_Date IS NULL
-    AND [period determined by filter bar]
-    AND cancellation-reason != 'Duplicate Project (Error)'
+  FROM `project-data` pd
+  LEFT JOIN timeline t ON pd.`project-dev-id` = t.`project-dev-id`
+  WHERE pd.`m3-submitted` IS NOT NULL
+    AND pd.`m3-approved` IS NULL
+    AND pd.`project-status` IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')
+    AND (t.`cancellation-reason` IS NULL OR t.`cancellation-reason` != 'Duplicate Project (Error)')
 
 Total A/R = M2 Outstanding + M3 Outstanding
+
+✅ ONLY includes active projects (Active, New Lender, Finance Hold, Pre-Approvals)
+❌ Excludes Complete, Cancelled, On Hold, Pending Cancel
 ```
 
 **Data Flow for Revenue Received**:
 ```
-accounting.revenue_received
-  WHERE [period determined by filter bar]
-  → SUM all revenue received in period
+M1 Revenue (20% of contract):
+  SELECT SUM(pd.`contract-price` * 0.2) AS m1_revenue
+  FROM `project-data` pd
+  LEFT JOIN timeline t ON pd.`project-dev-id` = t.`project-dev-id`
+  WHERE pd.`m1-received-date` IS NOT NULL
+    AND pd.`m1-received-date` IN [period]
+    AND (t.`cancellation-reason` IS NULL OR t.`cancellation-reason` != 'Duplicate Project (Error)')
+
+M2 Revenue (80% of contract):
+  SELECT SUM(pd.`contract-price` * 0.8) AS m2_revenue
+  FROM `project-data` pd
+  LEFT JOIN timeline t ON pd.`project-dev-id` = t.`project-dev-id`
+  WHERE pd.`m2-received-date` IS NOT NULL
+    AND pd.`m2-received-date` IN [period]
+    AND (t.`cancellation-reason` IS NULL OR t.`cancellation-reason` != 'Duplicate Project (Error)')
+
+Total Revenue = M1 Revenue + M2 Revenue
+→ SUM of all milestone revenue received in the selected period
 ```
 
 **Data Flow for Install M2 Not Approved**:
 ```
 SELECT SUM(pd.`contract-price` * 0.8) AS m2_amount
 FROM timeline t
-JOIN `project-data` pd ON t.`project-id` = pd.`project-id`
+JOIN `project-data` pd ON t.`project-dev-id` = pd.`project-dev-id`
 WHERE t.`install-complete` IS NOT NULL
   AND pd.`m2-approved` IS NULL
   AND [period determined by filter bar]
@@ -238,14 +257,20 @@ WHERE t.`install-complete` IS NOT NULL
 
 **Example for A/R**:
 ```
-Project #101: $50,000 contract - M2 submitted, not received
-  M2 Amount = $50,000 × 0.8 = $40,000 ✓ Include
+Project #101: $50,000 contract - M2 submitted, not received - Status: Active
+  M2 Amount = $50,000 × 0.8 = $40,000 ✓ Include (Active status)
 
-Project #102: $45,000 contract - M3 submitted, not received
-  M3 Amount = $45,000 × 0.2 = $9,000 ✓ Include
+Project #102: $45,000 contract - M3 submitted, not received - Status: Finance Hold
+  M3 Amount = $45,000 × 0.2 = $9,000 ✓ Include (Finance Hold status)
 
 Project #103: $60,000 contract - M2 already received
-  ✗ Exclude
+  ✗ Exclude (M2 already received)
+
+Project #104: $55,000 contract - M2 submitted, not received - Status: Complete
+  ✗ Exclude (Complete status - not actively pursuing)
+
+Project #105: $48,000 contract - M2 submitted, not received - Status: On Hold
+  ✗ Exclude (On Hold status - payment process frozen)
 
 Total A/R: $40,000 + $9,000 = $49,000
 ```
@@ -546,12 +571,15 @@ Find the function for your KPI:
 - MEDIAN calculations specified for all cycle times
 - M2/M3 percentage splits confirmed (80%/20%)
 
-### ⚠️ Pending Database Updates
-- **`accounting` table** - Currently being added to database for:
-  - A/R (M2/M3) calculations
-  - Revenue Received tracking
-  - M2/M3 submission and received dates
-- Once available, financial KPIs will be fully functional
+### ✅ Financial KPIs Implementation
+- **A/R (M2/M3)** - Uses `project-data` table for milestone tracking
+  - M2/M3 submission and received dates from `project-data`
+  - Filters by active project statuses (Active, New Lender, Finance Hold, Pre-Approvals)
+  - Excludes Complete, Cancelled, On Hold, Pending Cancel statuses
+- **Revenue Received** - Uses `project-data` table for milestone dates
+  - M1/M2 received dates from `project-data`
+  - Contract price percentages: M1 = 20%, M2 = 80%
+- All financial KPIs now fully functional with `project-data` table
 
 ### 📊 Current Database Statistics
 - **6,045 total projects** across all statuses

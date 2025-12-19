@@ -565,7 +565,7 @@ export async function getARM2M3(period: TimePeriod): Promise<KPIValue> {
     LEFT JOIN \`timeline\` t ON pd.\`project-dev-id\` = t.\`project-dev-id\`
     WHERE pd.\`m2-submitted\` IS NOT NULL
       AND pd.\`m2-received-date\` IS NULL
-      AND pd.\`project-status\` != 'Cancelled'
+      AND pd.\`project-status\` IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')
       AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
   `;
   
@@ -576,7 +576,7 @@ export async function getARM2M3(period: TimePeriod): Promise<KPIValue> {
     LEFT JOIN \`timeline\` t ON pd.\`project-dev-id\` = t.\`project-dev-id\`
     WHERE pd.\`m3-submitted\` IS NOT NULL
       AND pd.\`m3-approved\` IS NULL
-      AND pd.\`project-status\` != 'Cancelled'
+      AND pd.\`project-status\` IN ('Active', 'New Lender', 'Finance Hold', 'Pre-Approvals')
       AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
   `;
   
