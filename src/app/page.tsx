@@ -20,6 +20,9 @@ export default function Dashboard() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
+      // Clear server-side cache first
+      await fetch('/api/cache', { method: 'DELETE' });
+      // Then refetch with client-side cache busting
       await refetch();
       setLastUpdated(new Date());
     } finally {

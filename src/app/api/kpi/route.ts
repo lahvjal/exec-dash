@@ -93,6 +93,7 @@ export async function GET(request: NextRequest) {
         period,
         data: cached,
         cached: true,
+        timestamp: new Date().toISOString(),
       });
     }
     
@@ -107,6 +108,7 @@ export async function GET(request: NextRequest) {
       period,
       data,
       cached: false,
+      timestamp: new Date().toISOString(),
     });
     
   } catch (error: any) {
