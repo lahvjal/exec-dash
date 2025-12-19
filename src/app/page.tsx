@@ -65,40 +65,38 @@ export default function Dashboard() {
 
       {/* Page Header */}
       <div className="px-6 pt-6 max-w-[1600px] mx-auto">
-        <div className="mb-6 flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">
-              Executive Dashboard
-            </h1>
-            <div className="flex items-center gap-2 mt-1 text-sm text-slate-500">
-              <RefreshCw className="h-3.5 w-3.5" />
-              <span>
-                Last updated: {lastUpdated.toLocaleString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}
-              </span>
-            </div>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-900">
+            Executive Dashboard
+          </h1>
+          <div className="flex items-center gap-2 mt-1 text-sm text-slate-500">
+            <RefreshCw className="h-3.5 w-3.5" />
+            <span>
+              Last updated: {lastUpdated.toLocaleString("en-US", {
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+            </span>
           </div>
+        </div>
+      </div>
+
+      {/* Sticky Time Filter & Refresh Button */}
+      <div className="sticky top-20 z-20 px-6 pb-6 bg-transparent">
+        <div className="max-w-[1600px] mx-auto flex items-center justify-center gap-4">
+          <TimeFilter selected={selectedPeriod} onChange={setSelectedPeriod} />
           
           {/* Refresh Button */}
           <button
             onClick={handleRefresh}
             disabled={isRefreshing || loading}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
           </button>
-        </div>
-      </div>
-
-      {/* Sticky Time Filter */}
-      <div className="sticky top-20 z-20 px-6 pb-6 bg-transparent">
-        <div className="max-w-[1600px] mx-auto flex justify-center">
-          <TimeFilter selected={selectedPeriod} onChange={setSelectedPeriod} />
         </div>
       </div>
 
