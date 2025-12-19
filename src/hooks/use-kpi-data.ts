@@ -38,8 +38,8 @@ export function useKPIData(sections: KPISection[], period: TimePeriod): UseKPIDa
       
       sections.forEach((section) => {
         section.kpis.forEach((kpi) => {
-          // Only fetch if the KPI is available for this period
-          if (kpi.availablePeriods.includes(period)) {
+          // Only fetch if the KPI is available for this period and not hidden
+          if (kpi.availablePeriods.includes(period) && !kpi.hidden) {
             kpisToFetch.push({ kpiId: kpi.id, period });
           }
         });

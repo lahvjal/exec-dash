@@ -35,6 +35,7 @@ export interface KPIDefinition {
   availablePeriods: TimePeriod[];
   isHighlighted?: boolean;
   showGoal?: boolean;
+  hidden?: boolean;
   calculationMeta?: KPICalculationMeta;
 }
 
@@ -540,6 +541,7 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
         description: "Outstanding commercial receivables",
         format: "currency",
         availablePeriods: ["current_week"],
+        hidden: true,
         calculationMeta: {
           calculation: "Outstanding accounts receivable for commercial projects (same calculation as residential A/R).",
           dataSources: [
