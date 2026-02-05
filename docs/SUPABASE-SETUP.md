@@ -349,3 +349,4 @@ supabase db dump --table goals > goals-backup.sql
 **Need help?** Contact your development team or check the Supabase Discord community.
 
 
+
