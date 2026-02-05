@@ -42,10 +42,38 @@ export interface GoalsTable {
   Update: Partial<Omit<GoalRecord, 'id' | 'created_at' | 'updated_at'>>;
 }
 
+export interface CustomKPIRecord {
+  id: string;
+  kpi_id: string;
+  name: string;
+  description: string | null;
+  format: 'number' | 'currency' | 'percentage' | 'days';
+  formula_type: 'sql' | 'expression';
+  formula: string;
+  field_mappings: Record<string, any>;
+  available_periods: string[];
+  section_id: string;
+  is_active: boolean;
+  is_original: boolean;
+  is_hidden: boolean;
+  secondary_formula: string | null;
+  secondary_format: 'count' | 'breakdown' | 'text' | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CustomKPIsTable {
+  Row: CustomKPIRecord;
+  Insert: Omit<CustomKPIRecord, 'id' | 'created_at' | 'updated_at'>;
+  Update: Partial<Omit<CustomKPIRecord, 'id' | 'created_at' | 'updated_at'>>;
+}
+
 export interface Database {
   public: {
     Tables: {
       goals: GoalsTable;
+      custom_kpis: CustomKPIsTable;
     };
   };
 }

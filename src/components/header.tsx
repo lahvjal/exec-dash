@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Settings, User, Target } from "lucide-react";
+import { Bell, Settings, User, Target, Database } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 export function Header() {
   const pathname = usePathname();
   const isGoalsPage = pathname === "/goals";
+  const isKPIsPage = pathname === "/kpis";
   
   return (
     <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
@@ -33,6 +34,17 @@ export function Header() {
           <button className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors">
             <Bell className="h-5 w-5" />
           </button>
+          <Link
+            href="/kpis"
+            className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
+              isKPIsPage
+                ? "bg-blue-100 text-blue-600"
+                : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+            }`}
+            title="Manage KPIs"
+          >
+            <Database className="h-5 w-5" />
+          </Link>
           <Link
             href="/goals"
             className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${

@@ -1,6 +1,8 @@
 import { query, queryOne } from './db';
 import { TimePeriod, KPIValue, KPITrend, KPIStatus } from '@/types/kpi';
 import { supabase } from './supabase';
+import { replaceFieldTokens, extractExpressionVariables } from './formula-validator';
+import type { CustomKPIRecord } from './supabase';
 
 /**
  * KPI Service Layer
@@ -1192,10 +1194,297 @@ export async function getRevenueReceivedCommercial(period: TimePeriod): Promise<
 }
 
 // =============================================================================
+// CUSTOM KPI EXECUTION
+// =============================================================================
+
+/**
+ * Fetch custom KPI from Supabase
+ */
+async function getCustomKPI(kpiId: string): Promise<CustomKPIRecord | null> {
+  try {
+    const { data, error } = await supabase
+      .from('custom_kpis')
+      .select('*')
+      .eq('kpi_id', kpiId)
+      .eq('is_active', true)
+      .single();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return data as CustomKPIRecord;
+  } catch (error) {
+    console.error('Error fetching custom KPI:', error);
+    return null;
+  }
+}
+
+/**
+ * Format secondary value based on format type
+ */
+function formatSecondaryValue(value: any, format: 'count' | 'breakdown' | 'text' | null): string {
+  if (!format || value === null || value === undefined) return '';
+  
+  switch (format) {
+    case 'count':
+      return `${value} ${value === 1 ? 'item' : 'items'}`;
+    case 'breakdown':
+      // For breakdown, value should be an object with counts
+      if (typeof value === 'object') {
+        const parts = Object.entries(value)
+          .filter(([_, val]) => val !== null && val !== undefined)
+          .map(([key, val]) => `${val} ${key}`)
+          .join(', ');
+        return parts || String(value);
+      }
+      return String(value);
+    case 'text':
+      return String(value);
+    default:
+      return String(value);
+  }
+}
+
+/**
+ * Execute SQL-based custom KPI formula
+ */
+async function executeSQLFormula(
+  kpi: CustomKPIRecord,
+  period: TimePeriod
+): Promise<KPIValue> {
+  // Replace @field tokens with actual SQL field names
+  let sql = replaceFieldTokens(kpi.formula);
+  
+  // If formula has {{dateFilter}} placeholder, replace it with actual date filter
+  if (sql.includes('{{dateFilter}}')) {
+    const dateField = kpi.field_mappings?.dateField || 't.`contract-signed`';
+    const dateFilter = buildDateFilter(dateField, period);
+    sql = sql.replace(/\{\{dateFilter\}\}/gi, dateFilter);
+  }
+  
+  // Execute the query
+  const result = await queryOne<any>(sql);
+  
+  // Extract the value (look for common column names)
+  let value: number = 0;
+  if (result) {
+    value = result.value ?? result.count ?? result.total ?? result.avg_days ?? 0;
+  }
+  
+  // Format based on KPI format type
+  let formatted: string;
+  switch (kpi.format) {
+    case 'currency':
+      formatted = formatCurrency(value);
+      break;
+    case 'percentage':
+      formatted = formatPercentage(value);
+      break;
+    case 'days':
+      formatted = formatDays(value);
+      break;
+    default:
+      formatted = formatNumber(value);
+  }
+  
+  // Execute secondary formula if present
+  let secondaryValue: number | string | undefined;
+  let secondaryFormatted: string | undefined;
+  
+  if (kpi.secondary_formula) {
+    try {
+      let secondarySql = replaceFieldTokens(kpi.secondary_formula);
+      
+      // Replace date filter in secondary formula if needed
+      if (secondarySql.includes('{{dateFilter}}')) {
+        const dateField = kpi.field_mappings?.dateField || 't.`contract-signed`';
+        const dateFilter = buildDateFilter(dateField, period);
+        secondarySql = secondarySql.replace(/\{\{dateFilter\}\}/gi, dateFilter);
+      }
+      
+      const secondaryResult = await queryOne<any>(secondarySql);
+      
+      if (secondaryResult) {
+        // Extract secondary value
+        secondaryValue = secondaryResult.value ?? secondaryResult.count ?? secondaryResult.total_count;
+        
+        // Format based on secondary_format
+        if (kpi.secondary_format === 'breakdown' && typeof secondaryResult === 'object') {
+          // For breakdown, pass the entire result object
+          secondaryFormatted = formatSecondaryValue(secondaryResult, kpi.secondary_format);
+        } else {
+          secondaryFormatted = formatSecondaryValue(secondaryValue, kpi.secondary_format);
+        }
+      }
+    } catch (error) {
+      console.error('Error executing secondary formula:', error);
+      // Continue without secondary value if it fails
+    }
+  }
+  
+  // Get goal and calculate status, trend
+  const goal = await getGoal(kpi.kpi_id, period);
+  
+  // Calculate trend (compare with previous period if applicable)
+  let trend: KPITrend | undefined;
+  let trendValue: string | undefined;
+  
+  if (period === 'current_week' || period === 'mtd' || period === 'ytd') {
+    try {
+      // Get previous period value
+      const prevPeriod = period === 'current_week' ? 'previous_week' : period;
+      let prevSql = replaceFieldTokens(kpi.formula);
+      if (prevSql.includes('{{dateFilter}}')) {
+        const dateField = kpi.field_mappings?.dateField || 't.`contract-signed`';
+        const prevDateFilter = buildDateFilter(dateField, prevPeriod);
+        prevSql = prevSql.replace(/\{\{dateFilter\}\}/gi, prevDateFilter);
+      }
+      const prevResult = await queryOne<any>(prevSql);
+      const prevValue = prevResult?.value ?? prevResult?.count ?? prevResult?.total ?? prevResult?.avg_days ?? 0;
+      
+      const trendCalc = calculateTrend(value, prevValue);
+      trend = trendCalc.trend;
+      trendValue = trendCalc.trendValue;
+    } catch (error) {
+      // Silently fail trend calculation
+      console.error('Error calculating trend for custom KPI:', error);
+    }
+  }
+  
+  return {
+    value,
+    formatted,
+    secondaryValue,
+    secondaryFormatted,
+    status: calculateStatus(value, goal),
+    trend,
+    trendValue,
+    goal,
+    goalFormatted: goal ? formatNumber(goal) : undefined,
+    percentToGoal: goal ? Math.round((value / goal) * 100) : undefined,
+  };
+}
+
+/**
+ * Execute expression-based custom KPI formula
+ */
+async function executeExpressionFormula(
+  kpi: CustomKPIRecord,
+  period: TimePeriod
+): Promise<KPIValue> {
+  // Extract variable names from expression
+  const variables = extractExpressionVariables(kpi.formula);
+  
+  // Fetch values for each variable from field_mappings
+  const values: Record<string, number> = {};
+  
+  for (const varName of variables) {
+    const mapping = kpi.field_mappings?.[varName];
+    if (mapping) {
+      // If mapping is a KPI ID, fetch that KPI value
+      if (typeof mapping === 'string') {
+        const kpiValue = await getKPIValue(mapping, period);
+        values[varName] = typeof kpiValue.value === 'number' ? kpiValue.value : 0;
+      } else if (mapping.sql) {
+        // If mapping is a SQL query, execute it
+        const result = await queryOne<any>(mapping.sql);
+        values[varName] = result?.value ?? result?.count ?? 0;
+      }
+    } else {
+      values[varName] = 0;
+    }
+  }
+  
+  // Replace variables in formula with their values
+  let expression = kpi.formula;
+  for (const [varName, value] of Object.entries(values)) {
+    expression = expression.replace(new RegExp(`@${varName}`, 'g'), String(value));
+  }
+  
+  // Evaluate the expression safely
+  try {
+    // Use Function constructor for safer evaluation than eval()
+    // eslint-disable-next-line no-new-func
+    const result = new Function(`return ${expression}`)();
+    const value = Number(result) || 0;
+    
+    // Format based on KPI format type
+    let formatted: string;
+    switch (kpi.format) {
+      case 'currency':
+        formatted = formatCurrency(value);
+        break;
+      case 'percentage':
+        formatted = formatPercentage(value);
+        break;
+      case 'days':
+        formatted = formatDays(value);
+        break;
+      default:
+        formatted = formatNumber(value);
+    }
+    
+    // Get goal and calculate status
+    const goal = await getGoal(kpi.kpi_id, period);
+    
+    // For expression KPIs, trend calculation would require re-evaluating with previous period
+    // This is complex, so we'll skip trend for now or implement later if needed
+    
+    return {
+      value,
+      formatted,
+      status: calculateStatus(value, goal),
+      goal,
+      goalFormatted: goal ? formatNumber(goal) : undefined,
+      percentToGoal: goal ? Math.round((value / goal) * 100) : undefined,
+    };
+  } catch (error) {
+    console.error('Error evaluating expression:', error);
+    return {
+      value: 0,
+      formatted: 'Error',
+      status: 'neutral' as KPIStatus
+    };
+  }
+}
+
+/**
+ * Execute custom KPI formula
+ */
+async function executeCustomKPI(
+  kpi: CustomKPIRecord,
+  period: TimePeriod
+): Promise<KPIValue> {
+  if (kpi.formula_type === 'sql') {
+    return executeSQLFormula(kpi, period);
+  } else {
+    return executeExpressionFormula(kpi, period);
+  }
+}
+
+// =============================================================================
 // MAIN KPI FETCHER
 // =============================================================================
 
 export async function getKPIValue(kpiId: string, period: TimePeriod): Promise<KPIValue> {
+  // First, check if this is a custom or original KPI in database
+  const customKPI = await getCustomKPI(kpiId);
+  if (customKPI) {
+    try {
+      return await executeCustomKPI(customKPI, period);
+    } catch (error) {
+      console.error(`KPI ${kpiId} failed from database, falling back to TypeScript:`, error);
+      // If it's an original KPI and fails, fall through to TypeScript fallback
+      // If it's a custom KPI and fails, re-throw the error
+      if (!customKPI.is_original) {
+        throw error;
+      }
+      // Fall through to TypeScript implementation for original KPIs
+    }
+  }
+  
+  // TypeScript fallback for built-in KPIs
   switch (kpiId) {
     // Sales & Approval Pipeline
     case 'total_sales': return getTotalSales(period);

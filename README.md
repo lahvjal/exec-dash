@@ -9,13 +9,19 @@ A modern, real-time executive dashboard for tracking key performance indicators 
 
 ## ✨ Features
 
-- 📊 **26+ Real-time KPIs** across 6 business categories
+- 📊 **145+ Real-time KPIs** across 6 business categories
 - 🔄 **Live Database Integration** with MySQL (DigitalOcean)
 - 📈 **Trend Analysis** with period-over-period comparisons
 - 🎯 **Goal Tracking** with visual progress indicators
 - ⚡ **Performance Optimized** with 15-minute caching
 - 🎨 **Beautiful UI** with responsive Tailwind design
 - 🔒 **Secure** with SSL/TLS encryption and environment variables
+- 🛠️ **Custom KPI Builder** - Create and manage custom metrics without coding (NEW!)
+  - Visual formula editor with @ autocomplete
+  - SQL and expression formulas
+  - Live formula testing
+  - Pre-built templates
+  - Full database schema reference
 
 ## 🎯 KPI Categories
 
@@ -48,6 +54,31 @@ A modern, real-time executive dashboard for tracking key performance indicators 
 ### 6. Commercial Division
 - Total KW Scheduled & Installed
 - Commercial A/R & Revenue
+
+## 🛠️ KPI Formula Admin (NEW!)
+
+Create and manage custom KPI metrics without writing code! The KPI Admin feature provides a powerful interface for defining dynamic formulas using either SQL queries or JavaScript expressions.
+
+### Key Features
+
+- **Visual Formula Editor** - Rich text editor with @ autocomplete for database fields
+- **Real-Time Validation** - Instant feedback on formula syntax and security
+- **Formula Templates** - Pre-built patterns for common calculations
+- **Live Testing** - Test formulas with different time periods before saving
+- **Field Reference** - Browse complete database schema while editing
+- **Security Hardened** - SQL injection prevention and input validation
+
+### Access KPI Admin
+
+1. Click the **Database icon** in the header navigation
+2. Sign in with Supabase credentials
+3. Create, edit, or delete custom KPIs
+
+### Documentation
+
+- **User Guide:** [`docs/KPI-FORMULA-ADMIN.md`](docs/KPI-FORMULA-ADMIN.md)
+- **Setup Guide:** [`docs/KPI-ADMIN-SETUP.md`](docs/KPI-ADMIN-SETUP.md)
+- **Implementation:** [`KPI-ADMIN-IMPLEMENTATION-SUMMARY.md`](KPI-ADMIN-IMPLEMENTATION-SUMMARY.md)
 
 ## 🚀 Quick Start
 
@@ -101,21 +132,33 @@ A modern, real-time executive dashboard for tracking key performance indicators 
 ```
 ├── src/
 │   ├── app/
-│   │   ├── api/kpi/          # API routes
+│   │   ├── api/
+│   │   │   ├── kpi/          # KPI data API
+│   │   │   ├── kpis/         # KPI CRUD API (NEW)
+│   │   │   └── db-schema/    # Database schema API (NEW)
+│   │   ├── kpis/             # KPI admin page (NEW)
 │   │   ├── layout.tsx        # Root layout
 │   │   └── page.tsx          # Dashboard page
 │   ├── components/           # React components
 │   │   ├── header.tsx
 │   │   ├── kpi-card.tsx
 │   │   ├── kpi-section.tsx
-│   │   └── time-filter.tsx
+│   │   ├── time-filter.tsx
+│   │   ├── field-selector.tsx        # Field autocomplete (NEW)
+│   │   ├── formula-editor.tsx        # Formula editor (NEW)
+│   │   ├── kpi-form-modal.tsx        # KPI form (NEW)
+│   │   └── field-reference-panel.tsx # Field browser (NEW)
 │   ├── hooks/
 │   │   └── use-kpi-data.ts   # Data fetching hook
 │   ├── lib/
-│   │   ├── db.ts             # Database connection
-│   │   └── kpi-service.ts    # KPI calculations (800+ lines)
+│   │   ├── db.ts             # MySQL connection
+│   │   ├── supabase.ts       # Supabase client
+│   │   ├── kpi-service.ts    # KPI calculations (1000+ lines)
+│   │   └── formula-validator.ts # Formula validation (NEW)
 │   └── types/
 │       └── kpi.ts            # TypeScript types
+├── supabase-migrations/      # Supabase migrations (NEW)
+│   └── create-custom-kpis-table.sql
 ├── scripts/
 │   ├── explore-db.js         # Schema exploration tool
 │   └── test-connection.js    # Connection tester
