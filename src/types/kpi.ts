@@ -49,16 +49,16 @@ export interface KPISection {
 // Dashboard sections based on docs/dashboard-layout.md
 export const DASHBOARD_SECTIONS: KPISection[] = [
   {
-    id: "sales_pipeline",
-    title: "Sales & Approval Pipeline",
-    description: "High-level snapshot of sales performance and approval efficiency",
+    id: "sales_stats",
+    title: "Sales Stats",
+    description: "Sales performance, rep activity, and conversion metrics",
     kpis: [
       {
         id: "total_sales",
         name: "Total Sales",
         description: "Number of residential contracts sold",
         format: "number",
-        availablePeriods: ["current_week", "mtd", "ytd"],
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
         showGoal: true,
         calculationMeta: {
           calculation: "Counts all signed contracts in the selected period, excluding cancelled projects and duplicates.",
@@ -81,6 +81,7 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
         name: "Total Sales Goal",
         format: "number",
         availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
+        hidden: true,
         calculationMeta: {
           calculation: "Target number of sales for the selected period, configured in the Goals page.",
           dataSources: [
@@ -118,11 +119,121 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
       {
         id: "pull_through_rate",
         name: "Pull Through Rate",
-        description: "Active projects / Total Sales",
+        description: "Jobs with Install Complete / Total Jobs (for selected period)",
         format: "percentage",
-        availablePeriods: ["current_week", "mtd"],
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
         calculationMeta: {
-          calculation: "Percentage of sales that remain active in the pipeline (not cancelled or pending cancel).",
+          calculation: "Percentage of jobs sold during the selected period that have reached installation completion.",
+          dataSources: [
+            {
+              table: "timeline",
+              fields: ["contract-signed", "install-complete", "cancellation-reason", "project-dev-id"]
+            },
+            {
+              table: "project-data",
+              fields: ["project-status", "project-dev-id"]
+            }
+          ],
+          formula: "(COUNT(jobs with install-complete WHERE contract-signed IN [period]) / Total Jobs sold in [period]) × 100",
+          notes: "Period-specific metric. May be low for recent periods (jobs need time to complete). Shows count breakdown. Excludes cancelled projects and duplicates."
+        }
+      },
+      {
+        id: "battery_percentage",
+        name: "% Jobs with Battery",
+        description: "Percentage of sold jobs that include battery storage",
+        format: "percentage",
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
+        calculationMeta: {
+          calculation: "Percentage of sales that included battery storage systems.",
+          dataSources: [
+            {
+              table: "project-data",
+              fields: ["battery-count", "battery-model", "project-dev-id"]
+            },
+            {
+              table: "timeline",
+              fields: ["contract-signed", "cancellation-reason", "project-dev-id"]
+            }
+          ],
+          formula: "(COUNT(jobs WHERE battery-count > 0) / Total Sales) × 100",
+          notes: "Shows battery attachment rate. 41% of all projects in database have batteries. Shows count breakdown (e.g., '42.5% (25 of 59 jobs)')."
+        }
+      },
+      {
+        id: "packet_approval_percentage",
+        name: "% of Packet Approvals",
+        description: "Percentage of sales that received packet approval",
+        format: "percentage",
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
+        calculationMeta: {
+          calculation: "Percentage of sales from the period that have received packet approval.",
+          dataSources: [
+            {
+              table: "timeline",
+              fields: ["contract-signed", "packet-approval", "cancellation-reason", "project-dev-id"]
+            },
+            {
+              table: "project-data",
+              fields: ["project-status", "project-dev-id"]
+            }
+          ],
+          formula: "(COUNT(sales with packet-approval) / Total Sales) × 100",
+          notes: "Measures approval rate. Note: packet-approval field has 38% coverage in database. Shows count breakdown."
+        }
+      },
+      {
+        id: "reps_with_sale",
+        name: "Reps with a Sale",
+        description: "Number of unique sales reps (closers + setters) who closed deals",
+        format: "number",
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
+        calculationMeta: {
+          calculation: "Count of unique sales reps (closers and setters combined) who participated in sales during the period.",
+          dataSources: [
+            {
+              table: "timeline",
+              fields: ["contract-signed", "cancellation-reason", "project-dev-id"]
+            },
+            {
+              table: "project-data",
+              fields: ["sales-rep-id", "setter-id", "sales-rep-name", "setter-name", "project-status", "project-dev-id"]
+            }
+          ],
+          formula: "COUNT(DISTINCT sales-rep-id) + COUNT(DISTINCT setter-id) WHERE contract-signed IN [period]",
+          notes: "Shows total rep count with breakdown (e.g., '25 (15 closers, 10 setters)'). Excludes cancelled projects."
+        }
+      },
+      {
+        id: "pull_through_rolling_6m",
+        name: "Pull Through % (Rolling 6M)",
+        description: "Percentage of jobs sold 61-180 days ago that reached install complete",
+        format: "percentage",
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
+        calculationMeta: {
+          calculation: "Rolling 6-month pull-through rate: (Jobs with install-complete / Total jobs) for sales from 61-180 days ago.",
+          dataSources: [
+            {
+              table: "timeline",
+              fields: ["contract-signed", "install-complete", "cancellation-reason", "project-dev-id"]
+            },
+            {
+              table: "project-data",
+              fields: ["project-status", "project-dev-id"]
+            }
+          ],
+          formula: "(COUNT(jobs with install-complete) / Total jobs) × 100 WHERE contract-signed BETWEEN 61-180 days ago",
+          notes: "Fixed lookback window prevents 0% issue. Shows count breakdown (e.g., '65% (130 of 200 jobs)')."
+        }
+      },
+      {
+        id: "max_pull_through_rolling_6m",
+        name: "Max Pull Through % (Rolling 6M)",
+        description: "Percentage of jobs sold 61-180 days ago that are still active or complete",
+        format: "percentage",
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
+        calculationMeta: {
+          calculation: "Maximum potential pull-through: (Active jobs / Total jobs) for sales from 61-180 days ago.",
           dataSources: [
             {
               table: "timeline",
@@ -133,23 +244,23 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
               fields: ["project-status", "project-dev-id"]
             }
           ],
-          formula: "(COUNT(Active + Complete + Pre-Approvals + New Lender + Finance Hold) / Total Sales) × 100",
-          notes: "Measures retention rate of signed contracts through the pipeline."
+          formula: "(COUNT(Active jobs) / Total jobs) × 100 WHERE contract-signed BETWEEN 61-180 days ago",
+          notes: "Shows maximum achievable pull-through if all active jobs complete. Shows count breakdown."
         }
       },
     ],
   },
   {
-    id: "install_operations",
-    title: "Install Operations",
-    description: "Operational throughput and bottleneck indicators",
+    id: "operations_stats",
+    title: "Operations Stats",
+    description: "Installation throughput, cycle times, and operational bottlenecks",
     kpis: [
       {
         id: "jobs_on_hold",
         name: "Jobs Placed ON HOLD",
         description: "Jobs paused due to outstanding requirements",
         format: "number",
-        availablePeriods: ["current_week", "previous_week"],
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
         isHighlighted: true,
         calculationMeta: {
           calculation: "Counts all projects with 'On Hold' status, excluding duplicates.",
@@ -191,6 +302,7 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
         name: "Install Completion Goal",
         format: "number",
         availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
+        hidden: true,
         calculationMeta: {
           calculation: "Target number of installations for the selected period.",
           dataSources: [
@@ -227,7 +339,7 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
         name: "Install Scheduled",
         description: "Future installations on calendar",
         format: "number",
-        availablePeriods: ["current_week", "next_week"],
+        availablePeriods: ["current_week", "previous_week", "next_week"],
         calculationMeta: {
           calculation: "Counts all installations scheduled within the selected period.",
           dataSources: [
@@ -238,6 +350,47 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
           ],
           formula: "COUNT(*) WHERE install-appointment IS NOT NULL AND install-appointment IN [period] AND cancellation-reason != 'Duplicate Project (Error)'",
           notes: "Shows upcoming workload for installation teams."
+        }
+      },
+      {
+        id: "pto_received_count",
+        name: "PTO Received",
+        description: "Number of PTOs received in period",
+        format: "number",
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
+        calculationMeta: {
+          calculation: "Counts projects that received Permission to Operate (PTO) within the selected period.",
+          dataSources: [
+            {
+              table: "timeline",
+              fields: ["pto-received", "cancellation-reason"]
+            }
+          ],
+          formula: "COUNT(*) WHERE pto-received IS NOT NULL AND pto-received IN [period]",
+          notes: "Shows projects that received final approval to energize their solar systems. Excludes cancelled and duplicate projects."
+        }
+      },
+      {
+        id: "active_install_not_started",
+        name: "# of Active Jobs; Install Not Started",
+        description: "Active jobs without an install appointment scheduled",
+        format: "number",
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
+        isHighlighted: true,
+        calculationMeta: {
+          calculation: "Current snapshot of active projects that do not have an install appointment scheduled. No period filter applied.",
+          dataSources: [
+            {
+              table: "project-data",
+              fields: ["project-status", "project-dev-id"]
+            },
+            {
+              table: "timeline",
+              fields: ["install-appointment", "cancellation-reason", "project-dev-id"]
+            }
+          ],
+          formula: "COUNT(*) WHERE project-status = 'Active' AND install-appointment IS NULL",
+          notes: "Highlighted as operational bottleneck indicator. Status: danger if ≥50, warning if ≥20."
         }
       },
     ],
@@ -252,7 +405,7 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
         name: "Avg Days PP → Install Start",
         description: "Time from Perfect Packet to install start",
         format: "days",
-        availablePeriods: ["current_week", "previous_week", "mtd"],
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
         showGoal: true,
         calculationMeta: {
           calculation: "Average number of days between Perfect Packet approval and installation appointment. Lower is better.",
@@ -271,7 +424,7 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
         name: "Avg Days Install → M2 Approved",
         description: "Time from install appointment to M2 milestone",
         format: "days",
-        availablePeriods: ["previous_week", "ytd"],
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
         showGoal: true,
         calculationMeta: {
           calculation: "Average number of days between installation appointment and M2 milestone approval. Lower is better.",
@@ -294,7 +447,7 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
         name: "Avg Days PP → PTO",
         description: "Total time from PP submission to PTO",
         format: "days",
-        availablePeriods: ["previous_week", "mtd", "ytd"],
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
         showGoal: true,
         calculationMeta: {
           calculation: "Average total cycle time from Perfect Packet approval to Permission to Operate. Lower is better.",
@@ -306,6 +459,50 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
           ],
           formula: "AVG(DATEDIFF(pto-received, packet-approval)) WHERE both dates are NOT NULL",
           notes: "TODO: Update to MEDIAN. Complete cycle time metric. PTO-received coverage: 44.8% (2,713 records)."
+        }
+      },
+      {
+        id: "avg_sale_to_glass",
+        name: "Avg Days Sale → Glass on Roof",
+        description: "Time from contract signing to panel installation",
+        format: "days",
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
+        calculationMeta: {
+          calculation: "Average days from contract-signed to panel-install-complete. Lower is better.",
+          dataSources: [
+            {
+              table: "timeline",
+              fields: ["contract-signed", "panel-install-complete", "cancellation-reason", "project-dev-id"]
+            },
+            {
+              table: "project-data",
+              fields: ["project-status", "project-dev-id"]
+            }
+          ],
+          formula: "AVG(DATEDIFF(panel-install-complete, contract-signed)) WHERE both dates are NOT NULL",
+          notes: "Full pipeline metric from sale to physical installation completion. Excludes cancelled projects."
+        }
+      },
+      {
+        id: "avg_sale_to_pto",
+        name: "Avg Days Sale → PTO",
+        description: "Complete cycle time from contract to energization approval",
+        format: "days",
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
+        calculationMeta: {
+          calculation: "Average days from contract-signed to pto-received. Lower is better.",
+          dataSources: [
+            {
+              table: "timeline",
+              fields: ["contract-signed", "pto-received", "cancellation-reason", "project-dev-id"]
+            },
+            {
+              table: "project-data",
+              fields: ["project-status", "project-dev-id"]
+            }
+          ],
+          formula: "AVG(DATEDIFF(pto-received, contract-signed)) WHERE both dates are NOT NULL",
+          notes: "End-to-end pipeline metric. Shows complete project lifecycle duration. Excludes cancelled projects."
         }
       },
     ],
@@ -320,7 +517,7 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
         name: "A/R (M2/M3 Submitted Not Received)",
         description: "Outstanding accounts receivable",
         format: "currency",
-        availablePeriods: ["current_week", "previous_week", "mtd"],
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
         calculationMeta: {
           calculation: "Sum of M2 (80% of contract) and M3 (20% of contract) amounts that have been submitted but not yet received, for active projects only. Displays total project count with M2 and M3 breakdown.",
           dataSources: [
@@ -364,7 +561,7 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
         name: "Install Complete M2 Not Approved",
         description: "Financial backlog - install done but M2 incomplete",
         format: "currency",
-        availablePeriods: ["ytd"],
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
         isHighlighted: true,
         calculationMeta: {
           calculation: "Sum of M2 milestone amounts (80% of contract price) for completed installations that haven't received M2 approval.",
@@ -387,7 +584,7 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
         name: "Total Holdback Outstanding",
         description: "Money withheld until milestones pass",
         format: "currency",
-        availablePeriods: [],
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
         calculationMeta: {
           calculation: "Total funds held back by lenders pending milestone completion or inspection.",
           dataSources: [
@@ -405,7 +602,7 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
         name: "Total DCA Outstanding",
         description: "Amount in Document Control Audit",
         format: "currency",
-        availablePeriods: [],
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
         isHighlighted: true,
         calculationMeta: {
           calculation: "Total funds held in Document Control Audit pending document verification.",
@@ -431,7 +628,7 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
         name: "Active Pipeline (Active NO PTO)",
         description: "Active jobs that haven't achieved PTO",
         format: "number",
-        availablePeriods: ["current_week", "previous_week"],
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
         calculationMeta: {
           calculation: "Counts all projects with active statuses that have not yet received Permission to Operate (PTO).",
           dataSources: [
@@ -451,6 +648,65 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
     ],
   },
   {
+    id: "finance",
+    title: "Finance",
+    description: "Financial tracking for milestone payment milestones and receivables",
+    kpis: [
+      {
+        id: "install_started_m2_not_received",
+        name: "Install Started – M2 Not Received",
+        description: "Amount owed for completed installs pending M2 payment",
+        format: "currency",
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
+        calculationMeta: {
+          calculation: "Total value of projects with install complete but M2 payment not yet received. Shows snapshot of current receivables.",
+          dataSources: [
+            {
+              table: "timeline",
+              fields: ["install-complete", "project-dev-id", "cancellation-reason"]
+            },
+            {
+              table: "funding",
+              fields: ["contract-price", "m2-received-date", "project_ids"]
+            },
+            {
+              table: "project-data",
+              fields: ["project-status", "project-dev-id"]
+            }
+          ],
+          formula: "SUM(contract-price × 0.8) WHERE install-complete IS NOT NULL AND m2-received-date IS NULL",
+          notes: "M2 is 80% of contract price. Status indicator: danger if ≥$500k, warning if ≥$200k. Shows project count."
+        }
+      },
+      {
+        id: "pto_received_m3_not_received",
+        name: "PTO Received – M3 Not Received",
+        description: "Amount owed for PTO-complete projects pending M3 payment",
+        format: "currency",
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
+        calculationMeta: {
+          calculation: "Total value of projects with PTO received but M3 payment not yet received. Shows snapshot of current receivables.",
+          dataSources: [
+            {
+              table: "timeline",
+              fields: ["pto-received", "project-dev-id", "cancellation-reason"]
+            },
+            {
+              table: "funding",
+              fields: ["contract-price", "m3-received-date", "project_ids"]
+            },
+            {
+              table: "project-data",
+              fields: ["project-status", "project-dev-id"]
+            }
+          ],
+          formula: "SUM(contract-price × 0.2) WHERE pto-received IS NOT NULL AND m3-received-date IS NULL",
+          notes: "M3 is 20% of contract price. Status indicator: danger if ≥$300k, warning if ≥$100k. Shows project count."
+        }
+      },
+    ],
+  },
+  {
     id: "commercial",
     title: "Commercial Division",
     description: "Commercial KPIs based on KW capacity",
@@ -460,7 +716,7 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
         name: "Total KW Scheduled",
         description: "KW capacity scheduled",
         format: "number",
-        availablePeriods: ["current_week", "next_week"],
+        availablePeriods: ["current_week", "previous_week", "next_week"],
         showGoal: true,
         calculationMeta: {
           calculation: "Sum of system sizes (in KW) for installations scheduled but not yet completed in the period.",
@@ -482,7 +738,8 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
         id: "kw_scheduled_goal",
         name: "KW Scheduled Goal",
         format: "number",
-        availablePeriods: ["previous_week"],
+        availablePeriods: ["current_week", "previous_week", "next_week"],
+        hidden: true,
         calculationMeta: {
           calculation: "Target KW capacity to schedule for the period.",
           dataSources: [
@@ -522,7 +779,8 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
         id: "kw_installed_goal",
         name: "KW Installed Goal",
         format: "number",
-        availablePeriods: [],
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
+        hidden: true,
         calculationMeta: {
           calculation: "Target KW capacity to install for the period.",
           dataSources: [
@@ -540,7 +798,7 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
         name: "A/R (Commercial)",
         description: "Outstanding commercial receivables",
         format: "currency",
-        availablePeriods: ["current_week"],
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
         hidden: true,
         calculationMeta: {
           calculation: "Outstanding accounts receivable for commercial projects (same calculation as residential A/R).",
@@ -563,7 +821,7 @@ export const DASHBOARD_SECTIONS: KPISection[] = [
         name: "Revenue Received (Commercial)",
         description: "Commercial revenue collected",
         format: "currency",
-        availablePeriods: ["mtd"],
+        availablePeriods: ["current_week", "previous_week", "mtd", "ytd"],
         calculationMeta: {
           calculation: "Total revenue received for commercial projects in the period.",
           dataSources: [

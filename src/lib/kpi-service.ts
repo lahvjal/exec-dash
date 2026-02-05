@@ -324,31 +324,43 @@ export async function getAveyoApproved(period: TimePeriod): Promise<KPIValue> {
 }
 
 export async function getPullThroughRate(period: TimePeriod): Promise<KPIValue> {
+  // Pull through rate for selected period
+  // Shows completion rate for jobs sold during the selected time period
   const dateFilter = buildDateFilter('t.`contract-signed`', period);
   
-  // Get total sales count (denominator)
-  const totalSales = await getTotalSales(period);
-  const salesValue = typeof totalSales.value === 'number' ? totalSales.value : 0;
-  
-  // Get active projects count (numerator)
-  const activeSql = `
-    SELECT COUNT(*) as count
+  const totalSql = `
+    SELECT COUNT(*) as total
     FROM \`timeline\` t
     JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
-    WHERE pd.\`project-status\` IN ('Active', 'Complete', 'Pre-Approvals', 'New Lender', 'Finance Hold')
-      AND t.\`contract-signed\` IS NOT NULL
+    WHERE t.\`contract-signed\` IS NOT NULL
+      AND pd.\`project-status\` != 'Cancelled'
       AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
       AND ${dateFilter}
   `;
   
-  const result = await queryOne<{ count: number }>(activeSql);
-  const activeValue = result?.count || 0;
+  const completedSql = `
+    SELECT COUNT(*) as completed
+    FROM \`timeline\` t
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
+    WHERE t.\`contract-signed\` IS NOT NULL
+      AND t.\`install-complete\` IS NOT NULL
+      AND pd.\`project-status\` != 'Cancelled'
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+      AND ${dateFilter}
+  `;
   
-  const rate = salesValue > 0 ? (activeValue / salesValue) * 100 : 0;
+  const totalResult = await queryOne<{ total: number }>(totalSql);
+  const completedResult = await queryOne<{ completed: number }>(completedSql);
+  
+  const total = totalResult?.total || 0;
+  const completed = completedResult?.completed || 0;
+  const rate = total > 0 ? (completed / total) * 100 : 0;
   
   return {
     value: rate,
     formatted: formatPercentage(rate),
+    secondaryValue: completed,
+    secondaryFormatted: `${completed} of ${total} jobs`,
     status: rate >= 90 ? 'success' : rate >= 75 ? 'warning' : 'danger',
   };
 }
@@ -696,6 +708,47 @@ export async function getInstallM2NotApproved(period: TimePeriod): Promise<KPIVa
   };
 }
 
+export async function getInstallStartedM2NotReceived(period: TimePeriod): Promise<KPIValue> {
+  // No period filter - this is a snapshot of current state
+  // Shows all projects with install complete but M2 payment not yet received
+  
+  const amountSql = `
+    SELECT SUM(f.\`contract-price\` * 0.8) as total_amount
+    FROM \`timeline\` t
+    JOIN \`funding\` f ON t.\`project-dev-id\` = f.\`project_ids\`
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
+    WHERE t.\`install-complete\` IS NOT NULL
+      AND f.\`m2-received-date\` IS NULL
+      AND pd.\`project-status\` IN ('Active', 'Complete', 'Pre-Approvals', 'New Lender', 'Finance Hold')
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+  `;
+  
+  const countSql = `
+    SELECT COUNT(*) as count
+    FROM \`timeline\` t
+    JOIN \`funding\` f ON t.\`project-dev-id\` = f.\`project_ids\`
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
+    WHERE t.\`install-complete\` IS NOT NULL
+      AND f.\`m2-received-date\` IS NULL
+      AND pd.\`project-status\` IN ('Active', 'Complete', 'Pre-Approvals', 'New Lender', 'Finance Hold')
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+  `;
+  
+  const amountResult = await queryOne<{ total_amount: number }>(amountSql);
+  const countResult = await queryOne<{ count: number }>(countSql);
+  
+  const value = amountResult?.total_amount || 0;
+  const projectCount = countResult?.count || 0;
+  
+  return {
+    value,
+    formatted: formatCurrency(value),
+    secondaryValue: projectCount,
+    secondaryFormatted: `${projectCount} projects`,
+    status: value >= 500000 ? 'danger' : value >= 200000 ? 'warning' : 'success',
+  };
+}
+
 export async function getTotalHoldback(period: TimePeriod): Promise<KPIValue> {
   // Placeholder - need to clarify data source
   return {
@@ -709,6 +762,238 @@ export async function getTotalDCA(period: TimePeriod): Promise<KPIValue> {
   return {
     value: 0,
     formatted: formatCurrency(0),
+  };
+}
+
+export async function getPTOReceivedM3NotReceived(period: TimePeriod): Promise<KPIValue> {
+  // No period filter - this is a snapshot of current state
+  // Shows all projects with PTO received but M3 payment not yet received
+  
+  const amountSql = `
+    SELECT SUM(f.\`contract-price\` * 0.2) as total_amount
+    FROM \`timeline\` t
+    JOIN \`funding\` f ON t.\`project-dev-id\` = f.\`project_ids\`
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
+    WHERE t.\`pto-received\` IS NOT NULL
+      AND f.\`m3-received-date\` IS NULL
+      AND pd.\`project-status\` IN ('Active', 'Complete', 'Pre-Approvals', 'New Lender', 'Finance Hold')
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+  `;
+  
+  const countSql = `
+    SELECT COUNT(*) as count
+    FROM \`timeline\` t
+    JOIN \`funding\` f ON t.\`project-dev-id\` = f.\`project_ids\`
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
+    WHERE t.\`pto-received\` IS NOT NULL
+      AND f.\`m3-received-date\` IS NULL
+      AND pd.\`project-status\` IN ('Active', 'Complete', 'Pre-Approvals', 'New Lender', 'Finance Hold')
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+  `;
+  
+  const amountResult = await queryOne<{ total_amount: number }>(amountSql);
+  const countResult = await queryOne<{ count: number }>(countSql);
+  
+  const value = amountResult?.total_amount || 0;
+  const projectCount = countResult?.count || 0;
+  
+  return {
+    value,
+    formatted: formatCurrency(value),
+    secondaryValue: projectCount,
+    secondaryFormatted: `${projectCount} projects`,
+    status: value >= 300000 ? 'danger' : value >= 100000 ? 'warning' : 'success',
+  };
+}
+
+export async function getActiveInstallNotStarted(period: TimePeriod): Promise<KPIValue> {
+  // No period filter - this is a snapshot of current state
+  // Shows active projects without an install appointment
+  
+  const sql = `
+    SELECT COUNT(*) as count
+    FROM \`timeline\` t
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
+    WHERE pd.\`project-status\` = 'Active'
+      AND t.\`install-appointment\` IS NULL
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+  `;
+  
+  const result = await queryOne<{ count: number }>(sql);
+  const value = result?.count || 0;
+  
+  return {
+    value,
+    formatted: formatNumber(value),
+    status: value >= 50 ? 'danger' : value >= 20 ? 'warning' : 'success',
+  };
+}
+
+export async function getAvgSaleToGlass(period: TimePeriod): Promise<KPIValue> {
+  const dateFilter = buildDateFilter('t.`contract-signed`', period);
+  
+  const sql = `
+    SELECT AVG(DATEDIFF(t.\`panel-install-complete\`, t.\`contract-signed\`)) as avg_days
+    FROM \`timeline\` t
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
+    WHERE t.\`contract-signed\` IS NOT NULL
+      AND t.\`panel-install-complete\` IS NOT NULL
+      AND pd.\`project-status\` != 'Cancelled'
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+      AND ${dateFilter}
+  `;
+  
+  const result = await queryOne<{ avg_days: number }>(sql);
+  const value = result?.avg_days || 0;
+  
+  return {
+    value,
+    formatted: `${formatNumber(value)} days`,
+  };
+}
+
+export async function getAvgSaleToPTO(period: TimePeriod): Promise<KPIValue> {
+  const dateFilter = buildDateFilter('t.`contract-signed`', period);
+  
+  const sql = `
+    SELECT AVG(DATEDIFF(t.\`pto-received\`, t.\`contract-signed\`)) as avg_days
+    FROM \`timeline\` t
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
+    WHERE t.\`contract-signed\` IS NOT NULL
+      AND t.\`pto-received\` IS NOT NULL
+      AND pd.\`project-status\` != 'Cancelled'
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+      AND ${dateFilter}
+  `;
+  
+  const result = await queryOne<{ avg_days: number }>(sql);
+  const value = result?.avg_days || 0;
+  
+  return {
+    value,
+    formatted: `${formatNumber(value)} days`,
+  };
+}
+
+export async function getRepsWithSale(period: TimePeriod): Promise<KPIValue> {
+  const dateFilter = buildDateFilter('t.`contract-signed`', period);
+  
+  // Count unique closers (sales-rep-id) and setters (setter-id) who had sales in the period
+  const closersSql = `
+    SELECT COUNT(DISTINCT pd.\`sales-rep-id\`) as closer_count
+    FROM \`timeline\` t
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
+    WHERE t.\`contract-signed\` IS NOT NULL
+      AND pd.\`sales-rep-id\` IS NOT NULL
+      AND pd.\`sales-rep-id\` != ''
+      AND pd.\`project-status\` != 'Cancelled'
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+      AND ${dateFilter}
+  `;
+  
+  const settersSql = `
+    SELECT COUNT(DISTINCT pd.\`setter-id\`) as setter_count
+    FROM \`timeline\` t
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
+    WHERE t.\`contract-signed\` IS NOT NULL
+      AND pd.\`setter-id\` IS NOT NULL
+      AND pd.\`setter-id\` != ''
+      AND pd.\`project-status\` != 'Cancelled'
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+      AND ${dateFilter}
+  `;
+  
+  const closersResult = await queryOne<{ closer_count: number }>(closersSql);
+  const settersResult = await queryOne<{ setter_count: number }>(settersSql);
+  
+  const closerCount = closersResult?.closer_count || 0;
+  const setterCount = settersResult?.setter_count || 0;
+  const totalReps = closerCount + setterCount;
+  
+  return {
+    value: totalReps,
+    formatted: formatNumber(totalReps),
+    secondaryValue: closerCount,
+    secondaryFormatted: `${closerCount} closers, ${setterCount} setters`,
+  };
+}
+
+export async function getPullThroughRolling6Month(period: TimePeriod): Promise<KPIValue> {
+  // Rolling 6-month calculation: jobs sold 61-180 days ago
+  // Formula: (Jobs with install-complete / Total jobs sold) in that window
+  
+  const totalSql = `
+    SELECT COUNT(*) as total
+    FROM \`timeline\` t
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
+    WHERE t.\`contract-signed\` >= DATE_SUB(CURDATE(), INTERVAL 180 DAY)
+      AND t.\`contract-signed\` <= DATE_SUB(CURDATE(), INTERVAL 61 DAY)
+      AND pd.\`project-status\` != 'Cancelled'
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+  `;
+  
+  const completedSql = `
+    SELECT COUNT(*) as completed
+    FROM \`timeline\` t
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
+    WHERE t.\`contract-signed\` >= DATE_SUB(CURDATE(), INTERVAL 180 DAY)
+      AND t.\`contract-signed\` <= DATE_SUB(CURDATE(), INTERVAL 61 DAY)
+      AND t.\`install-complete\` IS NOT NULL
+      AND pd.\`project-status\` != 'Cancelled'
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+  `;
+  
+  const totalResult = await queryOne<{ total: number }>(totalSql);
+  const completedResult = await queryOne<{ completed: number }>(completedSql);
+  
+  const total = totalResult?.total || 0;
+  const completed = completedResult?.completed || 0;
+  const percentage = total > 0 ? (completed / total) * 100 : 0;
+  
+  return {
+    value: percentage,
+    formatted: formatPercentage(percentage),
+    secondaryValue: completed,
+    secondaryFormatted: `${completed} of ${total} jobs`,
+  };
+}
+
+export async function getMaxPullThroughRolling6Month(period: TimePeriod): Promise<KPIValue> {
+  // Rolling 6-month calculation: jobs sold 61-180 days ago
+  // Formula: (Active jobs / Total jobs sold) in that window
+  
+  const totalSql = `
+    SELECT COUNT(*) as total
+    FROM \`timeline\` t
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
+    WHERE t.\`contract-signed\` >= DATE_SUB(CURDATE(), INTERVAL 180 DAY)
+      AND t.\`contract-signed\` <= DATE_SUB(CURDATE(), INTERVAL 61 DAY)
+      AND pd.\`project-status\` != 'Cancelled'
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+  `;
+  
+  const activeSql = `
+    SELECT COUNT(*) as active
+    FROM \`timeline\` t
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
+    WHERE t.\`contract-signed\` >= DATE_SUB(CURDATE(), INTERVAL 180 DAY)
+      AND t.\`contract-signed\` <= DATE_SUB(CURDATE(), INTERVAL 61 DAY)
+      AND pd.\`project-status\` = 'Active'
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+  `;
+  
+  const totalResult = await queryOne<{ total: number }>(totalSql);
+  const activeResult = await queryOne<{ active: number }>(activeSql);
+  
+  const total = totalResult?.total || 0;
+  const active = activeResult?.active || 0;
+  const percentage = total > 0 ? (active / total) * 100 : 0;
+  
+  return {
+    value: percentage,
+    formatted: formatPercentage(percentage),
+    secondaryValue: active,
+    secondaryFormatted: `${active} of ${total} jobs`,
   };
 }
 
@@ -732,6 +1017,90 @@ export async function getActiveNoPTO(period: TimePeriod): Promise<KPIValue> {
   return {
     value,
     formatted: formatNumber(value),
+  };
+}
+
+export async function getPTOReceivedCount(period: TimePeriod): Promise<KPIValue> {
+  const dateFilter = buildDateFilter('`pto-received`', period);
+  
+  const sql = `
+    SELECT COUNT(*) as count
+    FROM \`timeline\`
+    WHERE \`pto-received\` IS NOT NULL
+      AND (\`cancellation-reason\` IS NULL OR \`cancellation-reason\` != 'Duplicate Project (Error)')
+      AND ${dateFilter}
+  `;
+  
+  const result = await queryOne<{ count: number }>(sql);
+  const value = result?.count || 0;
+  
+  return {
+    value,
+    formatted: formatNumber(value),
+  };
+}
+
+export async function getBatteryPercentage(period: TimePeriod): Promise<KPIValue> {
+  const dateFilter = buildDateFilter('t.`contract-signed`', period);
+  
+  // Get total sales in period (denominator)
+  const totalSales = await getTotalSales(period);
+  const totalValue = typeof totalSales.value === 'number' ? totalSales.value : 0;
+  
+  // Get sales with battery (numerator)
+  const batterySql = `
+    SELECT COUNT(*) as count
+    FROM \`timeline\` t
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
+    WHERE t.\`contract-signed\` IS NOT NULL
+      AND pd.\`battery-count\` > 0
+      AND pd.\`project-status\` != 'Cancelled'
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+      AND ${dateFilter}
+  `;
+  
+  const result = await queryOne<{ count: number }>(batterySql);
+  const batteryCount = result?.count || 0;
+  
+  const percentage = totalValue > 0 ? (batteryCount / totalValue) * 100 : 0;
+  
+  return {
+    value: percentage,
+    formatted: formatPercentage(percentage),
+    secondaryValue: batteryCount,
+    secondaryFormatted: `${batteryCount} of ${totalValue} jobs`,
+  };
+}
+
+export async function getPacketApprovalPercentage(period: TimePeriod): Promise<KPIValue> {
+  const dateFilter = buildDateFilter('t.`contract-signed`', period);
+  
+  // Get total sales in period (denominator)
+  const totalSales = await getTotalSales(period);
+  const totalValue = typeof totalSales.value === 'number' ? totalSales.value : 0;
+  
+  // Get packet approvals in same period (numerator)
+  const approvalSql = `
+    SELECT COUNT(*) as count
+    FROM \`timeline\` t
+    JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
+    WHERE t.\`contract-signed\` IS NOT NULL
+      AND t.\`packet-approval\` IS NOT NULL
+      AND pd.\`project-status\` != 'Cancelled'
+      AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+      AND ${dateFilter}
+  `;
+  
+  const result = await queryOne<{ count: number }>(approvalSql);
+  const approvalCount = result?.count || 0;
+  
+  const percentage = totalValue > 0 ? (approvalCount / totalValue) * 100 : 0;
+  
+  return {
+    value: percentage,
+    formatted: formatPercentage(percentage),
+    secondaryValue: approvalCount,
+    secondaryFormatted: `${approvalCount} of ${totalValue} sales`,
   };
 }
 
@@ -833,6 +1202,8 @@ export async function getKPIValue(kpiId: string, period: TimePeriod): Promise<KP
     case 'total_sales_goal': return getTotalSalesGoal(period);
     case 'aveyo_approved': return getAveyoApproved(period);
     case 'pull_through_rate': return getPullThroughRate(period);
+    case 'battery_percentage': return getBatteryPercentage(period);
+    case 'packet_approval_percentage': return getPacketApprovalPercentage(period);
     
     // Install Operations
     case 'jobs_on_hold': return getJobsOnHold(period);
@@ -853,8 +1224,23 @@ export async function getKPIValue(kpiId: string, period: TimePeriod): Promise<KP
     case 'total_holdback': return getTotalHoldback(period);
     case 'total_dca': return getTotalDCA(period);
     
+    // Finance Buckets
+    case 'install_started_m2_not_received': return getInstallStartedM2NotReceived(period);
+    case 'pto_received_m3_not_received': return getPTOReceivedM3NotReceived(period);
+    
     // Active Pipeline
     case 'active_no_pto': return getActiveNoPTO(period);
+    case 'pto_received_count': return getPTOReceivedCount(period);
+    
+    // Operations Metrics
+    case 'active_install_not_started': return getActiveInstallNotStarted(period);
+    case 'avg_sale_to_glass': return getAvgSaleToGlass(period);
+    case 'avg_sale_to_pto': return getAvgSaleToPTO(period);
+    
+    // Sales Stats
+    case 'reps_with_sale': return getRepsWithSale(period);
+    case 'pull_through_rolling_6m': return getPullThroughRolling6Month(period);
+    case 'max_pull_through_rolling_6m': return getMaxPullThroughRolling6Month(period);
     
     // Commercial Division
     case 'total_kw_scheduled': return getTotalKWScheduled(period);
