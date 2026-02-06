@@ -26,7 +26,7 @@ export async function getDashboardSections(): Promise<KPISection[]> {
       .eq('is_active', true)
       .eq('is_hidden', false)
       .order('section_id', { ascending: true })
-      .order('kpi_id', { ascending: true });
+      .order('display_order', { ascending: true });
 
     if (error) {
       console.error('Error fetching dashboard KPIs:', error);
