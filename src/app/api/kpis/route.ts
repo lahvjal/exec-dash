@@ -71,6 +71,7 @@ export async function GET(request: NextRequest) {
     // Format database KPIs
     const formattedKPIs = (allKPIs || []).map(kpi => ({
       id: kpi.kpi_id,
+      kpi_id: kpi.kpi_id, // Include both id and kpi_id for compatibility
       name: kpi.name,
       description: kpi.description || undefined,
       format: kpi.format,
