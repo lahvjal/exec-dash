@@ -31,18 +31,6 @@ export default function KPIsManagementPage() {
           </div>
         </div>
 
-        {/* Instructions */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <h3 className="font-semibold text-blue-900 mb-2">How to use:</h3>
-          <ul className="space-y-1 text-sm text-blue-800">
-            <li>• Drag sections to reorder them on the dashboard</li>
-            <li>• Drag KPIs to reorder within a section or move to a different section</li>
-            <li>• Use the eye icon to hide/show sections or KPIs</li>
-            <li>• Click "Add KPI" to create new KPIs in a section</li>
-            <li>• Click "Save Changes" to persist your reordering</li>
-          </ul>
-        </div>
-
         {/* Unified Manager */}
         <UnifiedKPIManager />
       </div>
