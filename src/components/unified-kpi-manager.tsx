@@ -511,16 +511,16 @@ export default function UnifiedKPIManager() {
 
             {/* KPIs List */}
             {expandedSections.has(section.section_id) && (
-              <div className="p-2 space-y-2">
+              <div className="p-4 grid grid-cols-3 gap-3">
                 {section.kpis.length === 0 ? (
-                  <div className="text-center py-8 text-slate-500 text-sm">
+                  <div className="col-span-3 text-center py-8 text-slate-500 text-sm">
                     No KPIs in this section. Click "Add KPI" to create one.
                   </div>
                 ) : (
                   section.kpis.map((kpi, kpiIndex) => (
                     <div
                       key={kpi.kpi_id}
-                      className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                      className={`flex flex-col p-3 rounded-lg border transition-colors ${
                         kpi.is_hidden ? 'bg-slate-50 border-slate-200' : 'bg-white border-slate-200 hover:border-blue-300'
                       }`}
                       draggable
@@ -528,63 +528,72 @@ export default function UnifiedKPIManager() {
                       onDragEnd={handleDragEnd}
                       onDragOver={(e) => handleDragOverKPI(e, section.section_id, kpiIndex)}
                     >
-                      <div className="cursor-move">
-                        <GripVertical className="h-4 w-4 text-slate-400" />
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-slate-900 truncate">{kpi.name}</span>
-                          {kpi.is_original && (
-                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
-                              Original
-                            </span>
-                          )}
-                          {kpi.is_hidden && (
-                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">
-                              Hidden
-                            </span>
-                          )}
+                      {/* Header with drag handle and badges */}
+                      <div className="flex items-start gap-2 mb-2">
+                        <div className="cursor-move pt-0.5">
+                          <GripVertical className="h-4 w-4 text-slate-400" />
                         </div>
-                        {kpi.description && (
-                          <p className="text-sm text-slate-500 truncate mt-0.5">{kpi.description}</p>
-                        )}
-                        <div className="flex items-center gap-3 mt-1">
-                          <span className="text-xs text-slate-500">
-                            {kpi.formula_type === 'sql' ? <Database className="h-3 w-3 inline mr-1" /> : <Code className="h-3 w-3 inline mr-1" />}
-                            {kpi.formula_type?.toUpperCase()}
-                          </span>
-                          <span className="text-xs text-slate-500">{kpi.format}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-slate-900 truncate">{kpi.name}</div>
+                          <div className="flex items-center gap-1 mt-1">
+                            {kpi.is_original && (
+                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                                Original
+                              </span>
+                            )}
+                            {kpi.is_hidden && (
+                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">
+                                Hidden
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => toggleKPIVisibility(section.section_id, kpi.kpi_id)}
-                        className="p-2 hover:bg-slate-100 rounded transition-colors"
-                        title={kpi.is_hidden ? 'Show KPI' : 'Hide KPI'}
-                      >
-                        {kpi.is_hidden ? (
-                          <EyeOff className="h-4 w-4 text-slate-400" />
-                        ) : (
-                          <Eye className="h-4 w-4 text-slate-600" />
-                        )}
-                      </button>
+                      {/* Description */}
+                      {kpi.description && (
+                        <p className="text-sm text-slate-500 line-clamp-2 mb-2">{kpi.description}</p>
+                      )}
 
-                      <button
-                        onClick={() => handleEditKPI(kpi)}
-                        className="p-2 hover:bg-blue-50 rounded transition-colors"
-                        title="Edit KPI"
-                      >
-                        <Edit className="h-4 w-4 text-blue-600" />
-                      </button>
+                      {/* Meta info */}
+                      <div className="flex items-center gap-3 mb-3 text-xs text-slate-500">
+                        <span className="flex items-center gap-1">
+                          {kpi.formula_type === 'sql' ? <Database className="h-3 w-3" /> : <Code className="h-3 w-3" />}
+                          {kpi.formula_type?.toUpperCase()}
+                        </span>
+                        <span>{kpi.format}</span>
+                      </div>
 
-                      <button
-                        onClick={() => handleDeleteKPI(kpi.kpi_id)}
-                        className="p-2 hover:bg-red-50 rounded transition-colors"
-                        title="Delete KPI"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-600" />
-                      </button>
+                      {/* Action buttons */}
+                      <div className="flex items-center gap-1 mt-auto pt-2 border-t border-slate-100">
+                        <button
+                          onClick={() => toggleKPIVisibility(section.section_id, kpi.kpi_id)}
+                          className="flex-1 p-2 hover:bg-slate-100 rounded transition-colors"
+                          title={kpi.is_hidden ? 'Show KPI' : 'Hide KPI'}
+                        >
+                          {kpi.is_hidden ? (
+                            <EyeOff className="h-4 w-4 text-slate-400 mx-auto" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-slate-600 mx-auto" />
+                          )}
+                        </button>
+
+                        <button
+                          onClick={() => handleEditKPI(kpi)}
+                          className="flex-1 p-2 hover:bg-blue-50 rounded transition-colors"
+                          title="Edit KPI"
+                        >
+                          <Edit className="h-4 w-4 text-blue-600 mx-auto" />
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteKPI(kpi.kpi_id)}
+                          className="flex-1 p-2 hover:bg-red-50 rounded transition-colors"
+                          title="Delete KPI"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-600 mx-auto" />
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}
