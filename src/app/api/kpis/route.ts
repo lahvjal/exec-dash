@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
         .select('*')
         .eq('is_active', true)
         .order('section_id', { ascending: true })
-        .order('kpi_id', { ascending: true });
+        .order('display_order', { ascending: true });
 
       if (error) {
         console.error('Error fetching KPIs from database:', error);
@@ -84,6 +84,8 @@ export async function GET(request: NextRequest) {
       is_custom: !kpi.is_original,  // For backwards compatibility
       is_original: kpi.is_original,
       is_hidden: kpi.is_hidden,
+      show_goal: kpi.show_goal,
+      display_order: kpi.display_order,
       secondary_formula: kpi.secondary_formula,
       secondary_format: kpi.secondary_format,
       created_at: kpi.created_at,
@@ -126,6 +128,7 @@ export async function GET(request: NextRequest) {
         is_original: true,
         is_hidden: kpi.is_hidden,
         show_goal: kpi.showGoal || false,
+        display_order: 0,
         secondary_formula: null,
         secondary_format: null,
         created_by: 'system',
@@ -259,6 +262,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Calculate next display_order for this section
+    const { data: maxOrderKPI } = await authenticatedClient
+      .from('custom_kpis')
+      .select('display_order')
+      .eq('section_id', section_id)
+      .order('display_order', { ascending: false })
+      .limit(1)
+      .single();
+    
+    const nextDisplayOrder = maxOrderKPI ? maxOrderKPI.display_order + 1 : 1;
+
     // Insert new KPI with authenticated client (for RLS)
     // Note: is_original defaults to false (custom KPIs)
     // Only original KPIs seeded from migration should have is_original = true
@@ -278,6 +292,7 @@ export async function POST(request: NextRequest) {
         is_original: is_original || false, // Explicitly set, defaults to false
         is_hidden: is_hidden || false,
         show_goal: show_goal || false,
+        display_order: nextDisplayOrder,
         secondary_formula: secondary_formula || null,
         secondary_format: secondary_format || null,
         created_by: user.id

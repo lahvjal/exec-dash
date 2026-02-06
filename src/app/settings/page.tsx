@@ -5,7 +5,6 @@ import { useAuth } from "@/components/auth-provider";
 import { supabase } from "@/lib/supabase";
 import { Target, Database, TrendingUp, ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
-import SectionOrderManager from "@/components/section-order-manager";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -165,21 +164,15 @@ export default function SettingsPage() {
             </div>
             <ArrowRight className="h-5 w-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
           </div>
-          <h3 className="text-xl font-bold text-slate-900 mb-2">KPI Management</h3>
+          <h3 className="text-xl font-bold text-slate-900 mb-2">KPI & Section Management</h3>
           <p className="text-slate-600 mb-4">
-            View, edit, and create custom KPI formulas. Manage both original and custom
-            metrics
+            Manage KPI formulas, reorder sections and KPIs, and configure dashboard layout with drag-and-drop
           </p>
           <div className="flex items-center gap-2 text-sm font-medium text-blue-600">
-            Manage KPIs
+            Manage KPIs & Sections
             <ArrowRight className="h-4 w-4" />
           </div>
         </Link>
-      </div>
-
-      {/* Section Order Manager */}
-      <div className="mb-12">
-        <SectionOrderManager />
       </div>
 
       {/* Quick Links */}
