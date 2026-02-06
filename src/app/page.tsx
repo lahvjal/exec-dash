@@ -4,17 +4,39 @@ import { useState, useEffect } from "react";
 import { Header } from "@/components/header";
 import { TimeFilter } from "@/components/time-filter";
 import { KPISection } from "@/components/kpi-section";
-import { DASHBOARD_SECTIONS, TimePeriod } from "@/types/kpi";
+import { TimePeriod, type KPISection as KPISectionType } from "@/types/kpi";
 import { RefreshCw, AlertCircle, Loader2 } from "lucide-react";
 import { useKPIData } from "@/hooks/use-kpi-data";
+import { getDashboardSectionsWithFallback } from "@/lib/dashboard-helpers";
 
 export default function Dashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>("current_week");
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [dashboardSections, setDashboardSections] = useState<KPISectionType[]>([]);
+  const [sectionsLoading, setSectionsLoading] = useState(true);
   
-  // Fetch KPI data from API
-  const { data: kpiData, loading, error, refetch } = useKPIData(DASHBOARD_SECTIONS, selectedPeriod);
+  // Fetch dashboard sections on mount
+  useEffect(() => {
+    async function fetchSections() {
+      try {
+        const sections = await getDashboardSectionsWithFallback();
+        setDashboardSections(sections);
+      } catch (error) {
+        console.error('Error fetching dashboard sections:', error);
+      } finally {
+        setSectionsLoading(false);
+      }
+    }
+    fetchSections();
+  }, []);
+  
+  // Fetch KPI data from API (only when sections are loaded)
+  const { data: kpiData, loading, error, refetch } = useKPIData(
+    dashboardSections, 
+    selectedPeriod,
+    { enabled: !sectionsLoading && dashboardSections.length > 0 }
+  );
   
   // Handle manual refresh
   const handleRefresh = async () => {
@@ -22,7 +44,12 @@ export default function Dashboard() {
     try {
       // Clear server-side cache first
       await fetch('/api/cache', { method: 'DELETE' });
-      // Then refetch with client-side cache busting
+      
+      // Refetch dashboard sections (in case new KPIs were added)
+      const sections = await getDashboardSectionsWithFallback();
+      setDashboardSections(sections);
+      
+      // Then refetch KPI data with client-side cache busting
       await refetch();
       setLastUpdated(new Date());
     } finally {
@@ -103,10 +130,12 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="px-6 pb-6 max-w-[1600px] mx-auto">
         {/* Loading State */}
-        {loading && (
+        {(sectionsLoading || loading) && (
           <div className="flex flex-col items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-slate-400 mb-4" />
-            <p className="text-slate-600">Loading KPI data...</p>
+            <p className="text-slate-600">
+              {sectionsLoading ? 'Loading dashboard...' : 'Loading KPI data...'}
+            </p>
           </div>
         )}
         
@@ -130,9 +159,9 @@ export default function Dashboard() {
         )}
         
         {/* Dashboard Sections */}
-        {!loading && !error && (
+        {!sectionsLoading && !loading && !error && dashboardSections.length > 0 && (
           <div className="space-y-8">
-            {DASHBOARD_SECTIONS.map((section) => (
+            {dashboardSections.map((section) => (
               <KPISection
                 key={section.id}
                 section={section}

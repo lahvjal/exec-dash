@@ -16,19 +16,35 @@ interface UseKPIDataReturn {
   refetch: () => Promise<void>;
 }
 
+interface UseKPIDataOptions {
+  enabled?: boolean;
+}
+
 /**
  * React hook to fetch KPI data from the API
  * 
  * @param sections - Array of KPI sections to fetch
  * @param period - Time period for the KPIs
+ * @param options - Additional options (e.g., enabled flag)
  * @returns Object with data, loading state, error, and refetch function
  */
-export function useKPIData(sections: KPISection[], period: TimePeriod): UseKPIDataReturn {
+export function useKPIData(
+  sections: KPISection[], 
+  period: TimePeriod,
+  options: UseKPIDataOptions = {}
+): UseKPIDataReturn {
+  const { enabled = true } = options;
   const [data, setData] = useState<KPIDataState>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
   const fetchKPIData = async (bustCache = false) => {
+    // Don't fetch if disabled or no sections
+    if (!enabled || sections.length === 0) {
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     
@@ -89,10 +105,10 @@ export function useKPIData(sections: KPISection[], period: TimePeriod): UseKPIDa
     }
   };
   
-  // Fetch data when sections or period changes
+  // Fetch data when sections, period, or enabled flag changes
   useEffect(() => {
     fetchKPIData();
-  }, [period]); // Only refetch when period changes
+  }, [sections, period, enabled]); // Refetch when any of these change
   
   return {
     data,

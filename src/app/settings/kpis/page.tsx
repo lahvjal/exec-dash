@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Header } from "@/components/header";
+import { useAuth } from "@/components/auth-provider";
 import { 
-  ArrowLeft, Plus, Edit, Trash2, Loader2, Lock, LogOut, 
+  ArrowLeft, Plus, Edit, Trash2, Loader2, 
   Code, Database, TrendingUp, AlertCircle, CheckCircle, EyeOff 
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import type { User } from "@supabase/supabase-js";
 import KPIFormModal from "@/components/kpi-form-modal";
 
 interface KPI {
@@ -49,7 +48,7 @@ interface KPIFormData {
 }
 
 export default function KPIsAdminPage() {
-  const [user, setUser] = useState<User | null>(null);
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState<{ builtIn: KPI[]; custom: KPI[]; total: number } | null>(null);
   const [filteredKPIs, setFilteredKPIs] = useState<KPI[]>([]);
@@ -59,19 +58,12 @@ export default function KPIsAdminPage() {
   const [showHiddenFilter, setShowHiddenFilter] = useState<'all' | 'visible' | 'hidden'>('all');
   const [showModal, setShowModal] = useState(false);
   const [editingKPI, setEditingKPI] = useState<KPIFormData | null>(null);
-  const [authError, setAuthError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
-    checkAuth();
+    fetchKPIs();
   }, []);
-
-  useEffect(() => {
-    if (user) {
-      fetchKPIs();
-    }
-  }, [user]);
 
   useEffect(() => {
     if (kpis) {
@@ -79,43 +71,40 @@ export default function KPIsAdminPage() {
     }
   }, [kpis, searchQuery, selectedSection, kpiTypeFilter, showHiddenFilter]);
 
-  const checkAuth = async () => {
-    try {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      
-      if (error || !user) {
-        setAuthError("Authentication required. Please sign in.");
-        setLoading(false);
-        return;
-      }
-
-      setUser(user);
-      setLoading(false);
-    } catch (error) {
-      console.error("Auth error:", error);
-      setAuthError("Authentication failed");
-      setLoading(false);
-    }
-  };
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    window.location.href = "/";
-  };
-
   const fetchKPIs = async () => {
     try {
-      const response = await fetch('/api/kpis');
+      setLoading(true);
+      
+      // Get session token for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: HeadersInit = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+      
+      const response = await fetch('/api/kpis', {
+        headers,
+        signal: AbortSignal.timeout(15000) // 15 second timeout
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
       
       if (data.success) {
         setKpis(data.kpis);
       } else {
-        showNotification('error', 'Failed to fetch KPIs');
+        console.error('API returned error:', data.error);
+        showNotification('error', `Failed to fetch KPIs: ${data.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error fetching KPIs:', error);
-      showNotification('error', 'Failed to fetch KPIs');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showNotification('error', `Failed to fetch KPIs: ${errorMessage}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -279,69 +268,26 @@ export default function KPIsAdminPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50">
-        <Header showTimeFilter={false} />
-        <div className="max-w-7xl mx-auto px-8 py-8">
-          <div className="flex items-center justify-center h-96">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (authError || !user) {
-    return (
-      <div className="min-h-screen bg-slate-50">
-        <Header showTimeFilter={false} />
-        <div className="max-w-7xl mx-auto px-8 py-8">
-          <div className="bg-white rounded-lg shadow-sm p-8 text-center max-w-md mx-auto">
-            <Lock className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-slate-900 mb-2">
-              Authentication Required
-            </h2>
-            <p className="text-slate-600 mb-6">
-              {authError || "You must be signed in to manage KPIs."}
-            </p>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Dashboard
-            </Link>
-          </div>
-        </div>
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Header showTimeFilter={false} />
-      
-      <div className="max-w-7xl mx-auto px-8 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/"
-              className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
-            >
-              <ArrowLeft className="h-5 w-5" />
-              <span>Back to Dashboard</span>
-            </Link>
-          </div>
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:text-slate-900 border border-slate-300 rounded-lg hover:border-slate-400 transition-colors"
-          >
-            <LogOut className="h-4 w-4" />
-            Sign Out
-          </button>
-        </div>
+    <div className="max-w-7xl mx-auto px-8 py-8">
+      {/* Header */}
+      <div className="mb-8">
+        <Link
+          href="/settings"
+          className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors mb-6"
+        >
+          <ArrowLeft className="h-5 w-5" />
+          <span>Back to Settings</span>
+        </Link>
+      </div>
 
-        <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold text-slate-900 mb-2">
               KPI Management
@@ -359,28 +305,28 @@ export default function KPIsAdminPage() {
           </button>
         </div>
 
-        {/* Notification */}
-        {notification && (
-          <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
-            notification.type === 'success' 
-              ? 'bg-green-50 border border-green-200' 
-              : 'bg-red-50 border border-red-200'
+      {/* Notification */}
+      {notification && (
+        <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
+          notification.type === 'success' 
+            ? 'bg-green-50 border border-green-200' 
+            : 'bg-red-50 border border-red-200'
+        }`}>
+          {notification.type === 'success' ? (
+            <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+          ) : (
+            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
+          )}
+          <span className={`text-sm ${
+            notification.type === 'success' ? 'text-green-800' : 'text-red-800'
           }`}>
-            {notification.type === 'success' ? (
-              <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
-            ) : (
-              <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
-            )}
-            <span className={`text-sm ${
-              notification.type === 'success' ? 'text-green-800' : 'text-red-800'
-            }`}>
-              {notification.message}
-            </span>
-          </div>
-        )}
+            {notification.message}
+          </span>
+        </div>
+      )}
 
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+      {/* Filters */}
+      <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div className="col-span-2">
               <input
@@ -426,9 +372,9 @@ export default function KPIsAdminPage() {
           </div>
         </div>
 
-        {/* Stats */}
-        {kpis && (
-          <div className="grid grid-cols-4 gap-6 mb-6">
+      {/* Stats */}
+      {kpis && (
+        <div className="grid grid-cols-4 gap-6 mb-6">
             <div className="bg-white rounded-lg shadow-sm p-6">
               <div className="flex items-center gap-3 mb-2">
                 <Database className="h-5 w-5 text-blue-600" />
@@ -460,10 +406,10 @@ export default function KPIsAdminPage() {
               </div>
             </div>
           </div>
-        )}
+      )}
 
-        {/* KPI List */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+      {/* KPI List */}
+      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
@@ -575,7 +521,6 @@ export default function KPIsAdminPage() {
             </table>
           </div>
         </div>
-      </div>
 
       {/* KPI Form Modal */}
       <KPIFormModal

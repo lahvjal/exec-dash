@@ -12,6 +12,13 @@ import type { CustomKPIRecord } from './supabase';
  */
 export async function getDashboardSections(): Promise<KPISection[]> {
   try {
+    // Fetch section order from database
+    const { data: sectionOrderData, error: orderError } = await supabase
+      .from('section_order')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true });
+
     // Fetch all active, non-hidden KPIs from database
     const { data: kpis, error } = await supabase
       .from('custom_kpis')
@@ -40,28 +47,75 @@ export async function getDashboardSections(): Promise<KPISection[]> {
       sectionMap.get(kpi.section_id)!.push(kpi);
     }
 
-    // Convert to KPISection format
+    // Determine section order (from database or fallback to default)
+    let sectionOrder: string[];
+    
+    if (!orderError && sectionOrderData && sectionOrderData.length > 0) {
+      // Use order from database
+      sectionOrder = sectionOrderData.map(s => s.section_id);
+    } else {
+      // Fallback to default order
+      sectionOrder = [
+        'sales_stats',
+        'operations_stats',
+        'cycle_times',
+        'residential_financials',
+        'active_pipeline',
+        'finance',
+        'commercial'
+      ];
+    }
+
+    // Convert to KPISection format in the correct order
     const sections: KPISection[] = [];
     
-    for (const [sectionId, sectionKpis] of sectionMap) {
-      const kpiDefinitions: KPIDefinition[] = sectionKpis.map(kpi => ({
-        id: kpi.kpi_id,
-        name: kpi.name,
-        description: kpi.description || undefined,
-        format: kpi.format,
-        availablePeriods: kpi.available_periods as any[],
-        isHighlighted: false, // TODO: Add to database schema if needed
-        showGoal: false,      // TODO: Determine from field_mappings or database
-        hidden: kpi.is_hidden,
-        calculationMeta: undefined // TODO: Could be stored in field_mappings
-      }));
+    // First, add sections in the defined order
+    for (const sectionId of sectionOrder) {
+      if (sectionMap.has(sectionId)) {
+        const sectionKpis = sectionMap.get(sectionId)!;
+        const kpiDefinitions: KPIDefinition[] = sectionKpis.map(kpi => ({
+          id: kpi.kpi_id,
+          name: kpi.name,
+          description: kpi.description || undefined,
+          format: kpi.format,
+          availablePeriods: kpi.available_periods as any[],
+          isHighlighted: false, // TODO: Add to database schema if needed
+          showGoal: false,      // TODO: Determine from field_mappings or database
+          hidden: kpi.is_hidden,
+          calculationMeta: undefined // TODO: Could be stored in field_mappings
+        }));
 
-      sections.push({
-        id: sectionId,
-        title: formatSectionTitle(sectionId),
-        description: getSectionDescription(sectionId),
-        kpis: kpiDefinitions
-      });
+        sections.push({
+          id: sectionId,
+          title: formatSectionTitle(sectionId),
+          description: getSectionDescription(sectionId),
+          kpis: kpiDefinitions
+        });
+      }
+    }
+    
+    // Then add any remaining sections not in the standard order
+    for (const [sectionId, sectionKpis] of sectionMap) {
+      if (!sectionOrder.includes(sectionId)) {
+        const kpiDefinitions: KPIDefinition[] = sectionKpis.map(kpi => ({
+          id: kpi.kpi_id,
+          name: kpi.name,
+          description: kpi.description || undefined,
+          format: kpi.format,
+          availablePeriods: kpi.available_periods as any[],
+          isHighlighted: false,
+          showGoal: false,
+          hidden: kpi.is_hidden,
+          calculationMeta: undefined
+        }));
+
+        sections.push({
+          id: sectionId,
+          title: formatSectionTitle(sectionId),
+          description: getSectionDescription(sectionId),
+          kpis: kpiDefinitions
+        });
+      }
     }
 
     return sections;

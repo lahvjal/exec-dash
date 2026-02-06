@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import AuthProvider from "@/components/auth-provider";
 
 const telegraf = localFont({
   src: [
@@ -46,7 +47,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${telegraf.variable} font-sans antialiased`}>
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

@@ -198,6 +198,13 @@ export function replaceFieldTokens(formula: string): string {
     '`$1`.`$2`'
   );
   
+  // Replace standalone @table references (e.g., FROM @timeline)
+  // This must come AFTER the @table.field replacements to avoid conflicts
+  result = result.replace(
+    /@([\w-]+)(?!\.)/g,
+    '`$1`'
+  );
+  
   return result;
 }
 

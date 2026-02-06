@@ -1452,7 +1452,7 @@ async function executeExpressionFormula(
 /**
  * Execute custom KPI formula
  */
-async function executeCustomKPI(
+export async function executeCustomKPI(
   kpi: CustomKPIRecord,
   period: TimePeriod
 ): Promise<KPIValue> {

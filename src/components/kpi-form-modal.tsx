@@ -162,22 +162,41 @@ export default function KPIFormModal({
     setTestResult(null);
     
     try {
-      // Create a temporary KPI and test it via the KPI API
-      const response = await fetch(`/api/kpi?kpiId=test_kpi&period=${testPeriod}`, {
+      // Test the formula using the test endpoint
+      const response = await fetch('/api/kpi/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           formula: formData.formula,
           formula_type: formData.formula_type,
           format: formData.format,
-          field_mappings: formData.field_mappings
+          field_mappings: formData.field_mappings,
+          period: testPeriod,
+          secondary_formula: formData.secondary_formula
         })
       });
       
       const data = await response.json();
-      setTestResult(data);
-    } catch (error) {
-      setTestResult({ success: false, error: 'Failed to test formula' });
+      
+      if (data.success) {
+        setTestResult({
+          success: true,
+          result: data.result,
+          message: data.message
+        });
+      } else {
+        setTestResult({
+          success: false,
+          error: data.error || 'Formula test failed',
+          details: data.details
+        });
+      }
+    } catch (error: any) {
+      setTestResult({
+        success: false,
+        error: 'Failed to test formula',
+        details: error.message
+      });
     } finally {
       setTesting(false);
     }
@@ -541,25 +560,35 @@ export default function KPIFormModal({
                 {testResult.success ? (
                   <div>
                     <div className="text-sm font-medium text-green-800 mb-2">
-                      Test Successful
+                      ✓ Test Successful
                     </div>
                     <div className="text-2xl font-bold text-green-900 mb-1">
-                      {testResult.data?.formatted || testResult.data?.value}
+                      {testResult.result?.formatted || testResult.result?.value}
                     </div>
-                    {testResult.executionTime && (
-                      <div className="text-xs text-green-700">
-                        Executed in {testResult.executionTime}ms
+                    {testResult.result?.secondary && (
+                      <div className="text-sm text-green-700 mt-2">
+                        {testResult.result.secondaryFormatted || testResult.result.secondary}
+                      </div>
+                    )}
+                    {testResult.result?.trend && (
+                      <div className="text-xs text-green-700 mt-1">
+                        Trend: {testResult.result.trend} {testResult.result.trendValue}
                       </div>
                     )}
                   </div>
                 ) : (
                   <div>
                     <div className="text-sm font-medium text-red-800 mb-1">
-                      Test Failed
+                      ✗ Test Failed
                     </div>
-                    <div className="text-sm text-red-700">
+                    <div className="text-sm text-red-700 mb-1">
                       {testResult.error || 'Unknown error'}
                     </div>
+                    {testResult.details && (
+                      <div className="text-xs text-red-600 mt-2 font-mono bg-red-100 p-2 rounded max-h-32 overflow-y-auto">
+                        {testResult.details}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

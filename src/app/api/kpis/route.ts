@@ -20,25 +20,16 @@ export async function GET(request: NextRequest) {
     let isAuthenticated = false;
     
     if (authHeader) {
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user } } = await supabase.auth.getUser(token);
-      isAuthenticated = !!user;
-    }
-
-    // Fetch ALL active KPIs from Supabase (including hidden ones if authenticated)
-    const { data: allKPIs, error } = await supabase
-      .from('custom_kpis')
-      .select('*')
-      .eq('is_active', true)
-      .order('section_id', { ascending: true })
-      .order('kpi_id', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching KPIs:', error);
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
-      );
+      try {
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user }, error } = await supabase.auth.getUser(token);
+        if (!error && user) {
+          isAuthenticated = true;
+        }
+      } catch (authError) {
+        console.error('Auth check error:', authError);
+        // Continue without authentication
+      }
     }
 
     // Get built-in KPIs from code (as fallback for KPIs not yet migrated)
@@ -53,6 +44,29 @@ export async function GET(request: NextRequest) {
         is_hidden: kpi.hidden || false
       }))
     );
+
+    // Fetch ALL active KPIs from Supabase (including hidden ones if authenticated)
+    let allKPIs: CustomKPIRecord[] | null = null;
+    try {
+      const { data, error } = await supabase
+        .from('custom_kpis')
+        .select('*')
+        .eq('is_active', true)
+        .order('section_id', { ascending: true })
+        .order('kpi_id', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching KPIs from database:', error);
+        console.log('Falling back to built-in KPIs only');
+        // Don't throw - just use built-in KPIs as fallback
+      } else {
+        allKPIs = data;
+      }
+    } catch (dbError) {
+      console.error('Database query failed:', dbError);
+      console.log('Falling back to built-in KPIs only');
+      // Continue without database KPIs
+    }
 
     // Format database KPIs
     const formattedKPIs = (allKPIs || []).map(kpi => ({
@@ -130,7 +144,22 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    // Create an authenticated Supabase client with the user's token
+    // This is necessary for RLS policies to work correctly
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const authenticatedClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    });
+    
+    // Verify the user is authenticated
+    const { data: { user }, error: authError } = await authenticatedClient.auth.getUser();
 
     if (authError || !user) {
       return NextResponse.json(
@@ -190,7 +219,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if KPI ID already exists
-    const { data: existing } = await supabase
+    const { data: existing } = await authenticatedClient
       .from('custom_kpis')
       .select('kpi_id')
       .eq('kpi_id', kpi_id)
@@ -203,10 +232,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Insert new KPI
+    // Insert new KPI with authenticated client (for RLS)
     // Note: is_original defaults to false (custom KPIs)
     // Only original KPIs seeded from migration should have is_original = true
-    const { data: newKPI, error: insertError } = await supabase
+    const { data: newKPI, error: insertError } = await authenticatedClient
       .from('custom_kpis')
       .insert({
         kpi_id,
@@ -264,7 +293,20 @@ export async function PUT(request: NextRequest) {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    // Create an authenticated Supabase client
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const authenticatedClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    });
+
+    const { data: { user }, error: authError } = await authenticatedClient.auth.getUser();
 
     if (authError || !user) {
       return NextResponse.json(
@@ -285,7 +327,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Fetch existing KPI to check if it's original
-    const { data: existingKPI, error: fetchError } = await supabase
+    const { data: existingKPI, error: fetchError } = await authenticatedClient
       .from('custom_kpis')
       .select('*')
       .eq('kpi_id', kpi_id)
@@ -330,8 +372,8 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Update KPI
-    const { data: updatedKPI, error: updateError } = await supabase
+    // Update KPI with authenticated client (for RLS)
+    const { data: updatedKPI, error: updateError } = await authenticatedClient
       .from('custom_kpis')
       .update(updates)
       .eq('kpi_id', kpi_id)
@@ -374,7 +416,20 @@ export async function DELETE(request: NextRequest) {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    // Create an authenticated Supabase client
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const authenticatedClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    });
+
+    const { data: { user }, error: authError } = await authenticatedClient.auth.getUser();
 
     if (authError || !user) {
       return NextResponse.json(
@@ -395,7 +450,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Fetch the KPI to check if it's original
-    const { data: kpi, error: fetchError } = await supabase
+    const { data: kpi, error: fetchError } = await authenticatedClient
       .from('custom_kpis')
       .select('is_original')
       .eq('kpi_id', kpi_id)
@@ -419,8 +474,8 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Soft delete by setting is_active to false
-    const { error: deleteError } = await supabase
+    // Soft delete by setting is_active to false (with authenticated client for RLS)
+    const { error: deleteError } = await authenticatedClient
       .from('custom_kpis')
       .update({ is_active: false })
       .eq('kpi_id', kpi_id);
