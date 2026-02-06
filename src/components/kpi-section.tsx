@@ -62,6 +62,7 @@ export function KPISection({ section, period, kpiData, className }: KPISectionPr
                 style={{ animationDelay: `${index * 50}ms` }}
               >
                 <KPICard
+                  kpiId={kpi.id}
                   title={kpi.name}
                   description={kpi.description}
                   data={data}

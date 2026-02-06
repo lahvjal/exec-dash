@@ -1,11 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { KPIValue, KPIStatus, KPITrend, KPICalculationMeta } from "@/types/kpi";
-import { TrendingUp, TrendingDown, Minus, AlertCircle } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, AlertCircle, Settings } from "lucide-react";
 import { Tooltip, KPITooltipContent } from "./ui/tooltip";
+import KPIDetailsModal from "./kpi-details-modal";
 
 interface KPICardProps {
+  kpiId: string;
   title: string;
   description?: string;
   data: KPIValue | null;
@@ -75,6 +78,7 @@ function getTrendStyles(trend?: KPITrend) {
 }
 
 export function KPICard({
+  kpiId,
   title,
   description,
   data,
@@ -83,6 +87,7 @@ export function KPICard({
   className,
   calculationMeta,
 }: KPICardProps) {
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const styles = getStatusStyles(data?.status, isHighlighted);
 
   if (!data) {
@@ -108,13 +113,14 @@ export function KPICard({
   }
 
   return (
-    <div
-      className={cn(
-        "rounded-card border p-5 transition-all duration-200 hover:shadow-md min-h-[160px] h-full flex flex-col",
-        styles.card,
-        className
-      )}
-    >
+    <>
+      <div
+        className={cn(
+          "group rounded-card border p-5 transition-all duration-200 hover:shadow-md min-h-[160px] h-full flex flex-col",
+          styles.card,
+          className
+        )}
+      >
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
@@ -132,6 +138,16 @@ export function KPICard({
                 }
               />
             )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDetailsModal(true);
+              }}
+              className="p-1 hover:bg-slate-200 rounded transition-colors opacity-0 group-hover:opacity-100"
+              title="View KPI Details"
+            >
+              <Settings className="h-3.5 w-3.5 text-slate-500" />
+            </button>
           </div>
           {description && (
             <p className="text-xs text-slate-400 mt-0.5">{description}</p>
@@ -203,7 +219,15 @@ export function KPICard({
           <span>vs previous period</span>
         </div>
       )}
-    </div>
+      </div>
+      
+      {/* KPI Details Modal */}
+      <KPIDetailsModal
+        isOpen={showDetailsModal}
+        onClose={() => setShowDetailsModal(false)}
+        kpiId={kpiId}
+      />
+    </>
   );
 }
 
