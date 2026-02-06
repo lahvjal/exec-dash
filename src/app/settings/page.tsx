@@ -47,8 +47,8 @@ export default function SettingsPage() {
       if (goalsData.success && goalsData.goals) {
         // Count how many goals are set (non-zero values)
         Object.values(goalsData.goals).forEach((kpiGoals: any) => {
-          Object.values(kpiGoals).forEach((value) => {
-            if (value && value > 0) goalsCount++;
+          Object.values(kpiGoals).forEach((value: any) => {
+            if (typeof value === 'number' && value > 0) goalsCount++;
           });
         });
       }

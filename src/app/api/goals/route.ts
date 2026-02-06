@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getServiceRoleClient } from '@/lib/supabase';
 import { invalidateGoalsCache } from '@/lib/kpi-service';
-import { clearKPICache } from '@/app/api/kpi/route';
+import { clearKPICache } from '@/lib/cache-utils';
 
 /**
  * Goals API Routes (Supabase Version)

@@ -105,7 +105,32 @@ export async function GET(request: NextRequest) {
 
     // Add any built-in KPIs from code that aren't in database yet
     const dbKpiIds = new Set(formattedKPIs.map(k => k.id));
-    const missingBuiltIns = builtInFromCode.filter(k => !dbKpiIds.has(k.id));
+    const missingBuiltIns = builtInFromCode
+      .filter(k => !dbKpiIds.has(k.id))
+      .map(kpi => ({
+        id: kpi.id,
+        kpi_id: kpi.id,
+        name: kpi.name,
+        description: kpi.description || undefined,
+        format: kpi.format,
+        availablePeriods: kpi.availablePeriods,
+        available_periods: kpi.availablePeriods,
+        section_id: kpi.section_id,
+        section_title: kpi.section_title,
+        formula: 'Built-in formula (TypeScript)',
+        formula_type: 'sql' as const,
+        field_mappings: {},
+        is_active: true,
+        is_built_in: true,
+        is_custom: false,
+        is_original: true,
+        is_hidden: kpi.is_hidden,
+        secondary_formula: null,
+        secondary_format: null,
+        created_by: 'system',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
     
     if (missingBuiltIns.length > 0) {
       visibleOriginal.push(...missingBuiltIns);

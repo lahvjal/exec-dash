@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getKPIValue } from '@/lib/kpi-service';
 import { testConnection } from '@/lib/db';
 import { TimePeriod, KPIValue } from '@/types/kpi';
+import { getCachedValue, setCachedValue } from '@/lib/cache-utils';
 
 /**
  * KPI API Route
@@ -14,45 +15,6 @@ import { TimePeriod, KPIValue } from '@/types/kpi';
  * 
  * Example: /api/kpi?kpiId=total_sales&period=current_week
  */
-
-// Cache configuration
-const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes in milliseconds
-const cache = new Map<string, { data: KPIValue; timestamp: number }>();
-
-function getCacheKey(kpiId: string, period: TimePeriod): string {
-  return `${kpiId}:${period}`;
-}
-
-function getCachedValue(kpiId: string, period: TimePeriod): KPIValue | null {
-  const key = getCacheKey(kpiId, period);
-  const cached = cache.get(key);
-  
-  if (!cached) return null;
-  
-  const age = Date.now() - cached.timestamp;
-  if (age > CACHE_DURATION) {
-    cache.delete(key);
-    return null;
-  }
-  
-  return cached.data;
-}
-
-function setCachedValue(kpiId: string, period: TimePeriod, data: KPIValue): void {
-  const key = getCacheKey(kpiId, period);
-  cache.set(key, { data, timestamp: Date.now() });
-}
-
-/**
- * Clear all KPI cache (call when goals are updated)
- */
-function clearKPICache(): void {
-  cache.clear();
-  console.log('KPI cache cleared');
-}
-
-// Export for use in other API routes
-export { clearKPICache };
 
 // GET /api/kpi?kpiId=xxx&period=xxx
 export async function GET(request: NextRequest) {

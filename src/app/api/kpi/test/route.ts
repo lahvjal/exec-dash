@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
       id: 'test_kpi_formula',
       kpi_id: 'test_kpi_formula',
       name: 'Test KPI',
+      description: 'Test KPI for formula validation',
       formula,
       formula_type,
       format,
@@ -76,6 +77,7 @@ export async function POST(request: NextRequest) {
       is_hidden: true,
       secondary_formula: secondary_formula || null,
       secondary_format: null,
+      created_by: 'test',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -88,7 +90,7 @@ export async function POST(request: NextRequest) {
       result: {
         value: result.value,
         formatted: result.formatted,
-        secondary: result.secondary,
+        secondaryValue: result.secondaryValue,
         secondaryFormatted: result.secondaryFormatted,
         status: result.status,
         trend: result.trend,

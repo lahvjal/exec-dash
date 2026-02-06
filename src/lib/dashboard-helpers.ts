@@ -95,7 +95,7 @@ export async function getDashboardSections(): Promise<KPISection[]> {
     }
     
     // Then add any remaining sections not in the standard order
-    for (const [sectionId, sectionKpis] of sectionMap) {
+    Array.from(sectionMap.entries()).forEach(([sectionId, sectionKpis]) => {
       if (!sectionOrder.includes(sectionId)) {
         const kpiDefinitions: KPIDefinition[] = sectionKpis.map(kpi => ({
           id: kpi.kpi_id,
@@ -116,7 +116,7 @@ export async function getDashboardSections(): Promise<KPISection[]> {
           kpis: kpiDefinitions
         });
       }
-    }
+    });
 
     return sections;
   } catch (error) {
@@ -250,11 +250,11 @@ export async function getMergedDashboardSections(): Promise<KPISection[]> {
   }
   
   // Add any remaining sections not in standard order
-  for (const [sectionId, section] of sectionMap) {
+  Array.from(sectionMap.entries()).forEach(([sectionId, section]) => {
     if (!sectionOrder.includes(sectionId)) {
       mergedSections.push(section);
     }
-  }
+  });
   
   return mergedSections;
 }
