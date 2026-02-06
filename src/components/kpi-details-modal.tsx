@@ -26,6 +26,7 @@ interface KPIDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   kpiId: string;
+  kpiData?: KPIDetails | null; // Optional: pass pre-loaded data to avoid fetching
 }
 
 const SECTION_NAMES: Record<string, string> = {
@@ -56,7 +57,8 @@ const FORMAT_NAMES: Record<string, string> = {
 export default function KPIDetailsModal({
   isOpen,
   onClose,
-  kpiId
+  kpiId,
+  kpiData
 }: KPIDetailsModalProps) {
   const [kpiDetails, setKpiDetails] = useState<KPIDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,9 +66,17 @@ export default function KPIDetailsModal({
 
   useEffect(() => {
     if (isOpen && kpiId) {
-      fetchKPIDetails();
+      // If kpiData is provided, use it directly
+      if (kpiData) {
+        setKpiDetails(kpiData);
+        setLoading(false);
+        setError(null);
+      } else {
+        // Otherwise fetch from API
+        fetchKPIDetails();
+      }
     }
-  }, [isOpen, kpiId]);
+  }, [isOpen, kpiId, kpiData]);
 
   const fetchKPIDetails = async () => {
     setLoading(true);
