@@ -413,35 +413,50 @@ export default function UnifiedKPIManager() {
       )}
 
       {/* Header Actions */}
-      {hasChanges && (
-        <div className="flex items-center justify-end gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+      <div className={`flex items-center justify-end gap-3 p-4 rounded-lg border transition-all ${
+        hasChanges 
+          ? 'bg-blue-50 border-blue-200' 
+          : 'bg-slate-50 border-slate-200'
+      }`}>
+        {hasChanges ? (
           <span className="text-sm text-blue-800 font-medium">You have unsaved changes</span>
-          <button
-            onClick={handleReset}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors"
-          >
-            <RotateCcw className="h-4 w-4" />
-            Reset
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 transition-colors"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                Save Changes
-              </>
-            )}
-          </button>
-        </div>
-      )}
+        ) : (
+          <span className="text-sm text-slate-500 font-medium">No changes to save</span>
+        )}
+        <button
+          onClick={handleReset}
+          disabled={!hasChanges}
+          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+            hasChanges
+              ? 'text-slate-700 bg-white border-slate-300 hover:bg-slate-50'
+              : 'text-slate-400 bg-slate-100 border-slate-200 cursor-not-allowed'
+          }`}
+        >
+          <RotateCcw className="h-4 w-4" />
+          Reset
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={saving || !hasChanges}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            hasChanges && !saving
+              ? 'text-white bg-blue-600 hover:bg-blue-700'
+              : 'text-slate-400 bg-slate-200 cursor-not-allowed'
+          }`}
+        >
+          {saving ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4" />
+              Save Changes
+            </>
+          )}
+        </button>
+      </div>
 
       {/* Sections List */}
       <div className="space-y-3">
