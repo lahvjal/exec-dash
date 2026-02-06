@@ -463,24 +463,33 @@ export default function UnifiedKPIManager() {
         {sections.map((section, sectionIndex) => (
           <div
             key={section.section_id}
-            className={`border border-slate-200 rounded-lg bg-white overflow-hidden transition-all cursor-grab active:cursor-grabbing ${
+            className={`border border-slate-200 rounded-lg bg-white overflow-hidden transition-all ${
               draggedItem?.type === 'section' && draggedItem.id === section.section_id
                 ? 'opacity-50 scale-[0.98]'
                 : 'hover:shadow-md'
             }`}
-            draggable
-            onDragStart={() => handleDragStart('section', section.section_id)}
-            onDragEnd={handleDragEnd}
             onDragOver={(e) => handleDragOverSection(e, sectionIndex)}
           >
             {/* Section Header */}
             <div className="flex items-center gap-3 p-4 bg-slate-50 border-b border-slate-200">
-              <div className="cursor-move hover:text-slate-600">
+              <div 
+                className="cursor-move hover:bg-slate-200 rounded p-1 -m-1 transition-colors"
+                draggable
+                onDragStart={(e) => {
+                  e.stopPropagation();
+                  handleDragStart('section', section.section_id);
+                }}
+                onDragEnd={handleDragEnd}
+              >
                 <GripVertical className="h-5 w-5 text-slate-400 hover:text-slate-600" />
               </div>
               
               <button
-                onClick={() => toggleSection(section.section_id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleSection(section.section_id);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
                 className="flex items-center gap-2 flex-1 text-left"
               >
                 {expandedSections.has(section.section_id) ? (
@@ -493,7 +502,11 @@ export default function UnifiedKPIManager() {
               </button>
 
               <button
-                onClick={() => toggleSectionVisibility(section.section_id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleSectionVisibility(section.section_id);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
                 className="p-2 hover:bg-slate-200 rounded transition-colors"
                 title={section.is_active ? 'Hide section' : 'Show section'}
               >
@@ -505,7 +518,11 @@ export default function UnifiedKPIManager() {
               </button>
 
               <button
-                onClick={() => handleAddKPI(section.section_id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddKPI(section.section_id);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 transition-colors"
               >
                 <Plus className="h-4 w-4" />
@@ -524,21 +541,26 @@ export default function UnifiedKPIManager() {
                   section.kpis.map((kpi, kpiIndex) => (
                     <div
                       key={kpi.kpi_id}
-                      className={`flex flex-col p-3 rounded-lg border transition-all cursor-grab active:cursor-grabbing ${
+                      className={`flex flex-col p-3 rounded-lg border transition-all ${
                         draggedItem?.type === 'kpi' && draggedItem.id === kpi.kpi_id 
                           ? 'opacity-50 scale-95' 
                           : kpi.is_hidden 
                             ? 'bg-slate-50 border-slate-200' 
                             : 'bg-white border-slate-200 hover:border-blue-300 hover:shadow-sm'
                       }`}
-                      draggable
-                      onDragStart={() => handleDragStart('kpi', kpi.kpi_id, section.section_id)}
-                      onDragEnd={handleDragEnd}
                       onDragOver={(e) => handleDragOverKPI(e, section.section_id, kpiIndex)}
                     >
                       {/* Header with drag handle and badges */}
                       <div className="flex items-start gap-2 mb-2">
-                        <div className="cursor-move pt-0.5 hover:bg-slate-100 rounded p-0.5 -m-0.5 transition-colors">
+                        <div 
+                          className="cursor-move pt-0.5 hover:bg-slate-100 rounded p-0.5 -m-0.5 transition-colors"
+                          draggable
+                          onDragStart={(e) => {
+                            e.stopPropagation();
+                            handleDragStart('kpi', kpi.kpi_id, section.section_id);
+                          }}
+                          onDragEnd={handleDragEnd}
+                        >
                           <GripVertical className="h-4 w-4 text-slate-400 hover:text-slate-600" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -575,7 +597,11 @@ export default function UnifiedKPIManager() {
                       {/* Action buttons */}
                       <div className="flex items-center gap-1 mt-auto pt-2 border-t border-slate-100">
                         <button
-                          onClick={() => toggleKPIVisibility(section.section_id, kpi.kpi_id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleKPIVisibility(section.section_id, kpi.kpi_id);
+                          }}
+                          onMouseDown={(e) => e.stopPropagation()}
                           className="flex-1 p-2 hover:bg-slate-100 rounded transition-colors"
                           title={kpi.is_hidden ? 'Show KPI' : 'Hide KPI'}
                         >
@@ -587,7 +613,11 @@ export default function UnifiedKPIManager() {
                         </button>
 
                         <button
-                          onClick={() => handleEditKPI(kpi)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditKPI(kpi);
+                          }}
+                          onMouseDown={(e) => e.stopPropagation()}
                           className="flex-1 p-2 hover:bg-blue-50 rounded transition-colors"
                           title="Edit KPI"
                         >
@@ -595,7 +625,11 @@ export default function UnifiedKPIManager() {
                         </button>
 
                         <button
-                          onClick={() => handleDeleteKPI(kpi.kpi_id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteKPI(kpi.kpi_id);
+                          }}
+                          onMouseDown={(e) => e.stopPropagation()}
                           className="flex-1 p-2 hover:bg-red-50 rounded transition-colors"
                           title="Delete KPI"
                         >
