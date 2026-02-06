@@ -75,6 +75,7 @@ export async function POST(request: NextRequest) {
       is_active: true,
       is_original: false,
       is_hidden: true,
+      show_goal: false,
       secondary_formula: secondary_formula || null,
       secondary_format: null,
       created_by: 'test',

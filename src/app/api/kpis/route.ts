@@ -125,6 +125,7 @@ export async function GET(request: NextRequest) {
         is_custom: false,
         is_original: true,
         is_hidden: kpi.is_hidden,
+        show_goal: kpi.showGoal || false,
         secondary_formula: null,
         secondary_format: null,
         created_by: 'system',
@@ -207,6 +208,7 @@ export async function POST(request: NextRequest) {
       section_id,
       is_original,
       is_hidden,
+      show_goal,
       secondary_formula,
       secondary_format
     } = body;
@@ -275,6 +277,7 @@ export async function POST(request: NextRequest) {
         is_active: true,
         is_original: is_original || false, // Explicitly set, defaults to false
         is_hidden: is_hidden || false,
+        show_goal: show_goal || false,
         secondary_formula: secondary_formula || null,
         secondary_format: secondary_format || null,
         created_by: user.id
