@@ -555,7 +555,7 @@ export default function UnifiedKPIManager() {
                           : dropTarget?.type === 'kpi' && dropTarget.sectionId === section.section_id && dropTarget.index === kpiIndex
                             ? 'border-2 border-dashed border-green-400 bg-green-50 shadow-md'
                           : kpi.is_hidden 
-                            ? 'bg-slate-50 border border-slate-200' 
+                            ? 'bg-slate-100 border border-slate-300 opacity-60 grayscale' 
                             : 'bg-white border border-slate-200 hover:border-blue-300 hover:shadow-sm'
                       }`}
                       onDragOver={(e) => handleDragOverKPI(e, section.section_id, kpiIndex)}
@@ -574,7 +574,7 @@ export default function UnifiedKPIManager() {
                           <GripVertical className="h-4 w-4 text-slate-400 hover:text-slate-600" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-slate-900 truncate">{kpi.name}</div>
+                          <div className={`font-medium truncate ${kpi.is_hidden ? 'text-slate-500' : 'text-slate-900'}`}>{kpi.name}</div>
                           <div className="flex items-center gap-1 mt-1">
                             {kpi.is_original && (
                               <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
@@ -582,7 +582,7 @@ export default function UnifiedKPIManager() {
                               </span>
                             )}
                             {kpi.is_hidden && (
-                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">
+                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-200 text-slate-700">
                                 Hidden
                               </span>
                             )}
@@ -592,11 +592,11 @@ export default function UnifiedKPIManager() {
 
                       {/* Description */}
                       {kpi.description && (
-                        <p className="text-sm text-slate-500 line-clamp-2 mb-2">{kpi.description}</p>
+                        <p className={`text-sm line-clamp-2 mb-2 ${kpi.is_hidden ? 'text-slate-400' : 'text-slate-500'}`}>{kpi.description}</p>
                       )}
 
                       {/* Meta info */}
-                      <div className="flex items-center gap-3 mb-3 text-xs text-slate-500">
+                      <div className={`flex items-center gap-3 mb-3 text-xs ${kpi.is_hidden ? 'text-slate-400' : 'text-slate-500'}`}>
                         <span className="flex items-center gap-1">
                           {kpi.formula_type === 'sql' ? <Database className="h-3 w-3" /> : <Code className="h-3 w-3" />}
                           {kpi.formula_type?.toUpperCase()}
