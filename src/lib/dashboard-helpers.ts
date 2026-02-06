@@ -80,7 +80,7 @@ export async function getDashboardSections(): Promise<KPISection[]> {
           format: kpi.format,
           availablePeriods: kpi.available_periods as any[],
           isHighlighted: false, // TODO: Add to database schema if needed
-          showGoal: false,      // TODO: Determine from field_mappings or database
+          showGoal: kpi.show_goal || false,
           hidden: kpi.is_hidden,
           calculationMeta: undefined // TODO: Could be stored in field_mappings
         }));
@@ -104,7 +104,7 @@ export async function getDashboardSections(): Promise<KPISection[]> {
           format: kpi.format,
           availablePeriods: kpi.available_periods as any[],
           isHighlighted: false,
-          showGoal: false,
+          showGoal: kpi.show_goal || false,
           hidden: kpi.is_hidden,
           calculationMeta: undefined
         }));

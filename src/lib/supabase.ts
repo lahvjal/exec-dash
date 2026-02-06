@@ -56,6 +56,7 @@ export interface CustomKPIRecord {
   is_active: boolean;
   is_original: boolean;
   is_hidden: boolean;
+  show_goal: boolean;
   secondary_formula: string | null;
   secondary_format: 'count' | 'breakdown' | 'text' | null;
   created_by: string | null;
