@@ -69,6 +69,7 @@ export default function UnifiedKPIManager() {
   const [saving, setSaving] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [draggedItem, setDraggedItem] = useState<{ type: 'section' | 'kpi'; id: string; sectionId?: string } | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ type: 'section' | 'kpi'; sectionId: string; index: number } | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingKPI, setEditingKPI] = useState<KPIFormData | null>(null);
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
@@ -164,6 +165,7 @@ export default function UnifiedKPIManager() {
 
   const handleDragEnd = () => {
     setDraggedItem(null);
+    setDropTarget(null);
   };
 
   const handleDragOverSection = (e: React.DragEvent, targetIndex: number) => {
@@ -172,6 +174,8 @@ export default function UnifiedKPIManager() {
 
     const sourceIndex = sections.findIndex(s => s.section_id === draggedItem.id);
     if (sourceIndex === targetIndex) return;
+
+    setDropTarget({ type: 'section', sectionId: sections[targetIndex].section_id, index: targetIndex });
 
     const newSections = [...sections];
     const [movedSection] = newSections.splice(sourceIndex, 1);
@@ -190,6 +194,8 @@ export default function UnifiedKPIManager() {
     e.stopPropagation();
     
     if (!draggedItem || draggedItem.type !== 'kpi') return;
+
+    setDropTarget({ type: 'kpi', sectionId: targetSectionId, index: targetIndex });
 
     const sourceSectionIndex = sections.findIndex(s => s.section_id === draggedItem.sectionId);
     const targetSectionIndex = sections.findIndex(s => s.section_id === targetSectionId);
@@ -463,10 +469,12 @@ export default function UnifiedKPIManager() {
         {sections.map((section, sectionIndex) => (
           <div
             key={section.section_id}
-            className={`border border-slate-200 rounded-lg bg-white overflow-hidden transition-all ${
+            className={`rounded-lg bg-white overflow-hidden transition-all relative ${
               draggedItem?.type === 'section' && draggedItem.id === section.section_id
-                ? 'opacity-50 scale-[0.98]'
-                : 'hover:shadow-md'
+                ? 'border-2 border-blue-500 shadow-lg shadow-blue-200 ring-2 ring-blue-300 ring-offset-2'
+                : dropTarget?.type === 'section' && dropTarget.index === sectionIndex
+                  ? 'border-2 border-dashed border-green-400 bg-green-50'
+                : 'border border-slate-200 hover:shadow-md'
             }`}
             onDragOver={(e) => handleDragOverSection(e, sectionIndex)}
           >
@@ -541,12 +549,14 @@ export default function UnifiedKPIManager() {
                   section.kpis.map((kpi, kpiIndex) => (
                     <div
                       key={kpi.kpi_id}
-                      className={`flex flex-col p-3 rounded-lg border transition-all ${
+                      className={`flex flex-col p-3 rounded-lg transition-all relative ${
                         draggedItem?.type === 'kpi' && draggedItem.id === kpi.kpi_id 
-                          ? 'opacity-50 scale-95' 
+                          ? 'border-2 border-blue-500 shadow-lg shadow-blue-200 bg-blue-50 ring-2 ring-blue-300 ring-offset-2 z-50' 
+                          : dropTarget?.type === 'kpi' && dropTarget.sectionId === section.section_id && dropTarget.index === kpiIndex
+                            ? 'border-2 border-dashed border-green-400 bg-green-50 shadow-md'
                           : kpi.is_hidden 
-                            ? 'bg-slate-50 border-slate-200' 
-                            : 'bg-white border-slate-200 hover:border-blue-300 hover:shadow-sm'
+                            ? 'bg-slate-50 border border-slate-200' 
+                            : 'bg-white border border-slate-200 hover:border-blue-300 hover:shadow-sm'
                       }`}
                       onDragOver={(e) => handleDragOverKPI(e, section.section_id, kpiIndex)}
                     >
