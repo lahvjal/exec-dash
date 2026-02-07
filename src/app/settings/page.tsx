@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { supabase } from "@/lib/supabase";
-import { Target, Database, TrendingUp, ArrowRight, Loader2 } from "lucide-react";
+import { Target, Database, TrendingUp, ArrowRight, Loader2, FileText } from "lucide-react";
 import Link from "next/link";
 
 export default function SettingsPage() {
@@ -130,7 +130,7 @@ export default function SettingsPage() {
       )}
 
       {/* Action Cards */}
-      <div className="grid grid-cols-2 gap-6 mb-12">
+      <div className="grid grid-cols-3 gap-6 mb-12">
         {/* Goals Management Card */}
         <Link
           href="/settings/goals"
@@ -173,6 +173,27 @@ export default function SettingsPage() {
             <ArrowRight className="h-4 w-4" />
           </div>
         </Link>
+
+        {/* Documentation Card */}
+        <Link
+          href="/settings/documentation"
+          className="group bg-white rounded-lg shadow-sm border border-slate-200 p-8 hover:shadow-md hover:border-slate-300 transition-all"
+        >
+          <div className="flex items-start justify-between mb-4">
+            <div className="h-12 w-12 rounded-lg bg-emerald-100 flex items-center justify-center">
+              <FileText className="h-6 w-6 text-emerald-600" />
+            </div>
+            <ArrowRight className="h-5 w-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
+          </div>
+          <h3 className="text-xl font-bold text-slate-900 mb-2">KPI Documentation</h3>
+          <p className="text-slate-600 mb-4">
+            View complete metric dictionary, formulas, data sources, and period definitions
+          </p>
+          <div className="flex items-center gap-2 text-sm font-medium text-blue-600">
+            View Documentation
+            <ArrowRight className="h-4 w-4" />
+          </div>
+        </Link>
       </div>
 
       {/* Quick Links */}
@@ -196,6 +217,12 @@ export default function SettingsPage() {
             className="text-sm text-blue-600 hover:text-blue-700 transition-colors"
           >
             Set Goals →
+          </Link>
+          <Link
+            href="/settings/documentation"
+            className="text-sm text-blue-600 hover:text-blue-700 transition-colors"
+          >
+            View Metric Documentation →
           </Link>
         </div>
       </div>
