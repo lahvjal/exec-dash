@@ -581,6 +581,11 @@ export default function UnifiedKPIManager() {
                                 Original
                               </span>
                             )}
+                            {!kpi.is_original && (
+                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
+                                Custom
+                              </span>
+                            )}
                             {kpi.is_hidden && (
                               <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-200 text-slate-700">
                                 Hidden
