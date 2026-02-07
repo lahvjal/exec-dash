@@ -6,6 +6,7 @@ import { KPIValue, KPIStatus, KPITrend, KPICalculationMeta } from "@/types/kpi";
 import { TrendingUp, TrendingDown, Minus, AlertCircle, Settings } from "lucide-react";
 import { Tooltip, KPITooltipContent } from "./ui/tooltip";
 import KPIDetailsModal from "./kpi-details-modal";
+import { PipelineMilestoneChart } from "./pipeline-milestone-chart";
 
 interface KPICardProps {
   kpiId: string;
@@ -168,12 +169,23 @@ export function KPICard({
 
       {/* Main Value */}
       <div className="flex-1">
-        <div className="flex flex-col gap-1">
-          <span className="text-3xl font-bold text-slate-900">{data.formatted}</span>
-          {data.secondaryFormatted && (
-            <span className="text-sm text-slate-500">{data.secondaryFormatted}</span>
-          )}
-        </div>
+        {kpiId === 'active_no_pto' && data.metadata?.milestones ? (
+          <div className="mt-2">
+            {/* Total number at top left - uses actual displayValue from query */}
+            <div className="text-4xl font-bold text-slate-900 mb-1">{data.formatted}</div>
+            <div className="text-xs text-slate-500 mb-5">Total Active Projects (No PTO)</div>
+            
+            {/* Pipeline breakdown chart */}
+            <PipelineMilestoneChart milestones={data.metadata.milestones} />
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            <span className="text-3xl font-bold text-slate-900">{data.formatted}</span>
+            {data.secondaryFormatted && (
+              <span className="text-sm text-slate-500">{data.secondaryFormatted}</span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Goal Progress */}

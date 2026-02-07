@@ -1005,22 +1005,80 @@ export async function getMaxPullThroughRolling6Month(period: TimePeriod): Promis
 // ACTIVE PIPELINE
 // =============================================================================
 
+interface PipelineMilestone {
+  stage: number;
+  name: string;
+  fullName: string;
+  count: number;
+}
+
 export async function getActiveNoPTO(period: TimePeriod): Promise<KPIValue> {
+  // Query to get count of projects at each milestone stage
   const sql = `
-    SELECT COUNT(*) as count
+    SELECT 
+      CASE
+        WHEN t.\`pto-submitted\` IS NOT NULL AND t.\`pto-received\` IS NULL THEN 13
+        WHEN t.\`ahj-inspection-complete\` IS NOT NULL THEN 12
+        WHEN t.\`install-complete\` IS NOT NULL THEN 11
+        WHEN t.\`panel-install-complete\` IS NOT NULL THEN 10
+        WHEN t.\`install-appointment\` IS NOT NULL THEN 9
+        WHEN t.\`install-ready-date\` IS NOT NULL THEN 8
+        WHEN t.\`equipment-ordered\` IS NOT NULL THEN 7
+        WHEN t.\`all-permits-complete\` IS NOT NULL THEN 6
+        WHEN t.\`engineering-complete\` IS NOT NULL THEN 5
+        WHEN t.\`ntp-complete\` IS NOT NULL THEN 4
+        WHEN t.\`site-survey-complete\` IS NOT NULL THEN 3
+        WHEN t.\`contract-signed\` IS NOT NULL THEN 2
+        ELSE 1
+      END as milestone_stage,
+      COUNT(*) as count
     FROM \`project-data\` pd
     JOIN \`timeline\` t ON pd.\`project-dev-id\` = t.\`project-dev-id\`
     WHERE pd.\`project-status\` IN ('Active', 'Complete', 'Pre-Approvals', 'New Lender', 'Finance Hold')
       AND t.\`pto-received\` IS NULL
       AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
+    GROUP BY milestone_stage
+    ORDER BY milestone_stage
   `;
   
-  const result = await queryOne<{ count: number }>(sql);
-  const value = result?.count || 0;
+  const results = await query<{ milestone_stage: number; count: number }>(sql);
+  
+  // Define all milestone stages with names
+  const milestoneDefinitions = [
+    { stage: 1, name: '1', fullName: 'Initial - No Milestones', count: 0 },
+    { stage: 2, name: '2', fullName: 'Contract Signed', count: 0 },
+    { stage: 3, name: '3', fullName: 'Site Survey Complete', count: 0 },
+    { stage: 4, name: '4', fullName: 'NTP Complete', count: 0 },
+    { stage: 5, name: '5', fullName: 'Engineering Complete', count: 0 },
+    { stage: 6, name: '6', fullName: 'All Permits Complete', count: 0 },
+    { stage: 7, name: '7', fullName: 'Equipment Ordered', count: 0 },
+    { stage: 8, name: '8', fullName: 'Install Ready', count: 0 },
+    { stage: 9, name: '9', fullName: 'Install Appointment Scheduled', count: 0 },
+    { stage: 10, name: '10', fullName: 'Panel Install Complete', count: 0 },
+    { stage: 11, name: '11', fullName: 'Install Complete', count: 0 },
+    { stage: 12, name: '12', fullName: 'AHJ Inspection Complete', count: 0 },
+    { stage: 13, name: '13', fullName: 'PTO Submitted - Awaiting Approval', count: 0 },
+  ];
+  
+  // Map results to milestone definitions (update counts from query results)
+  const milestones: PipelineMilestone[] = milestoneDefinitions.map(def => {
+    const result = results.find((r) => r.milestone_stage === def.stage);
+    return {
+      stage: def.stage,
+      name: def.name,
+      fullName: def.fullName,
+      count: result ? result.count : 0
+    };
+  });
+  
+  const totalCount = milestones.reduce((sum, m) => sum + m.count, 0);
   
   return {
-    value,
-    formatted: formatNumber(value),
+    value: totalCount,
+    formatted: formatNumber(totalCount),
+    metadata: {
+      milestones: milestones
+    }
   };
 }
 
@@ -1470,6 +1528,11 @@ export async function executeCustomKPI(
 // =============================================================================
 
 export async function getKPIValue(kpiId: string, period: TimePeriod): Promise<KPIValue> {
+  // Special case: active_no_pto always uses TypeScript implementation for milestone breakdown
+  if (kpiId === 'active_no_pto') {
+    return getActiveNoPTO(period);
+  }
+  
   // First, check if this is a custom or original KPI in database
   const customKPI = await getCustomKPI(kpiId);
   if (customKPI) {

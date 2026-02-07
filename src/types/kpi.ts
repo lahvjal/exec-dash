@@ -15,6 +15,14 @@ export interface KPIValue {
   status?: KPIStatus;
   secondaryValue?: number | string;
   secondaryFormatted?: string;
+  metadata?: {
+    milestones?: Array<{
+      stage: number;
+      name: string;
+      fullName: string;
+      count: number;
+    }>;
+  };
 }
 
 export interface KPICalculationMeta {
