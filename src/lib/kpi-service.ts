@@ -963,6 +963,8 @@ export async function getPullThroughRolling6Month(period: TimePeriod): Promise<K
 export async function getMaxPullThroughRolling6Month(period: TimePeriod): Promise<KPIValue> {
   // Rolling 6-month calculation: jobs sold 61-180 days ago
   // Formula: (Active jobs / Total jobs sold) in that window
+  // Active = ALL jobs EXCEPT Cancelled, Pending Cancel, On Hold, Finance Hold
+  // (includes: Active, Complete, Pre-Approvals, New Lender, etc.)
   
   const totalSql = `
     SELECT COUNT(*) as total
@@ -980,7 +982,7 @@ export async function getMaxPullThroughRolling6Month(period: TimePeriod): Promis
     JOIN \`project-data\` pd ON t.\`project-dev-id\` = pd.\`project-dev-id\`
     WHERE t.\`contract-signed\` >= DATE_SUB(CURDATE(), INTERVAL 180 DAY)
       AND t.\`contract-signed\` <= DATE_SUB(CURDATE(), INTERVAL 61 DAY)
-      AND pd.\`project-status\` = 'Active'
+      AND pd.\`project-status\` NOT IN ('Cancelled', 'Pending Cancel', 'On Hold', 'Finance Hold')
       AND (t.\`cancellation-reason\` IS NULL OR t.\`cancellation-reason\` != 'Duplicate Project (Error)')
   `;
   
