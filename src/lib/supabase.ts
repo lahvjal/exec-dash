@@ -19,7 +19,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-// Service role client for server-side admin operations
+// Service role client for server-side admin/internal reads (bypasses RLS)
 export const getServiceRoleClient = () => {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   
@@ -32,6 +32,26 @@ export const getServiceRoleClient = () => {
       autoRefreshToken: false,
       persistSession: false
     }
+  });
+};
+
+/**
+ * Create an authenticated Supabase client for use inside API route handlers.
+ *
+ * Pass the raw Authorization header from the incoming request. The user's JWT
+ * is forwarded so Supabase applies RLS policies for the "authenticated" role —
+ * no service role key needed for user-scoped reads/writes.
+ *
+ * Usage in an API route:
+ *   const client = createAuthenticatedClient(request.headers.get('authorization'));
+ *   if (!client) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+ */
+export const createAuthenticatedClient = (authHeader: string | null) => {
+  if (!authHeader) return null;
+
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { autoRefreshToken: false, persistSession: false },
   });
 };
 

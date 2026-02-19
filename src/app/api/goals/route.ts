@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { supabase, createAuthenticatedClient } from '@/lib/supabase';
 import { invalidateGoalsCache } from '@/lib/kpi-service';
 import { clearKPICache } from '@/lib/cache-utils';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 /**
  * Goals API Routes (Supabase Version)
@@ -26,9 +22,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const authenticatedClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
-    });
+    const authenticatedClient = createAuthenticatedClient(authHeader);
+
+    if (!authenticatedClient) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
 
     const { data, error } = await authenticatedClient
       .from('goals')
@@ -150,10 +151,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Upsert goals using the authenticated client so RLS policies apply
-    const authenticatedClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
-    });
-    const { error: upsertError } = await authenticatedClient
+    const { error: upsertError } = await createAuthenticatedClient(authHeader)!
       .from('goals')
       .upsert(upsertData, {
         onConflict: 'kpi_id,period',

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, createAuthenticatedClient } from '@/lib/supabase';
 import { DASHBOARD_SECTIONS } from '@/types/kpi';
 import type { CustomKPIRecord } from '@/lib/supabase';
 
@@ -52,14 +52,7 @@ export async function GET(request: NextRequest) {
     // public read policy exists — callers should always send the auth header.
     let allKPIs: CustomKPIRecord[] | null = null;
     try {
-      const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-      const readClient = authHeader
-        ? createSupabaseClient(supabaseUrl, supabaseAnonKey, {
-            global: { headers: { Authorization: authHeader } }
-          })
-        : supabase;
+      const readClient = createAuthenticatedClient(authHeader) ?? supabase;
       const { data, error } = await readClient
         .from('custom_kpis')
         .select('*')
@@ -185,22 +178,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    
-    // Create an authenticated Supabase client with the user's token
-    // This is necessary for RLS policies to work correctly
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const authenticatedClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    });
-    
-    // Verify the user is authenticated
+    const authenticatedClient = createAuthenticatedClient(authHeader);
+
+    if (!authenticatedClient) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
     const { data: { user }, error: authError } = await authenticatedClient.auth.getUser();
 
     if (authError || !user) {
@@ -348,19 +334,14 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    
-    // Create an authenticated Supabase client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const authenticatedClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    });
+    const authenticatedClient = createAuthenticatedClient(authHeader);
+
+    if (!authenticatedClient) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
 
     const { data: { user }, error: authError } = await authenticatedClient.auth.getUser();
 
@@ -471,19 +452,14 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    
-    // Create an authenticated Supabase client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const authenticatedClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    });
+    const authenticatedClient = createAuthenticatedClient(authHeader);
+
+    if (!authenticatedClient) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
 
     const { data: { user }, error: authError } = await authenticatedClient.auth.getUser();
 

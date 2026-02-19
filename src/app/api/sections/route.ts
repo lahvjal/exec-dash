@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+import { createAuthenticatedClient } from '@/lib/supabase';
 
 /**
  * Section Order API
@@ -14,21 +11,16 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 // GET - Fetch section order
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
+    const client = createAuthenticatedClient(request.headers.get('authorization'));
 
-    if (!authHeader) {
+    if (!client) {
       return NextResponse.json(
         { success: false, error: 'Authentication required' },
         { status: 401 }
       );
     }
 
-    // Use the user's session token so RLS authenticated policies apply
-    const authenticatedClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
-    });
-
-    const { data: sections, error } = await authenticatedClient
+    const { data: sections, error } = await client
       .from('section_order')
       .select('*')
       .eq('is_active', true)
@@ -68,14 +60,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    const authenticatedClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    });
+    const authenticatedClient = createAuthenticatedClient(authHeader);
+
+    if (!authenticatedClient) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
 
     const { data: { user }, error: authError } = await authenticatedClient.auth.getUser();
 
