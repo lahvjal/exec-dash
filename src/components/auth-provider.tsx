@@ -8,17 +8,25 @@ import { Loader2, ShieldX } from "lucide-react";
 const ORG_CHART_URL =
   process.env.NEXT_PUBLIC_ORG_CHART_URL || "http://localhost:5173";
 
+export interface UserProfile {
+  full_name: string | null;
+  job_title: string | null;
+  profile_photo_url: string | null;
+}
+
 interface AuthContextType {
   user: User | null;
+  profile: UserProfile | null;
   loading: boolean;
 }
 
-const AuthContext = createContext<AuthContextType>({ user: null, loading: true });
+const AuthContext = createContext<AuthContextType>({ user: null, profile: null, loading: true });
 
 export const useAuth = () => useContext(AuthContext);
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -35,14 +43,19 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         return;
       }
 
-      const { data: profile } = await supabase
+      const { data: profileData } = await supabase
         .from("profiles")
-        .select("is_admin")
+        .select("is_admin, full_name, job_title, profile_photo_url")
         .eq("id", user.id)
         .single();
 
       setUser(user);
-      setIsAdmin(profile?.is_admin ?? false);
+      setIsAdmin(profileData?.is_admin ?? false);
+      setProfile({
+        full_name: profileData?.full_name ?? null,
+        job_title: profileData?.job_title ?? null,
+        profile_photo_url: profileData?.profile_photo_url ?? null,
+      });
     } catch (err) {
       console.error("Auth check failed:", err);
       window.location.href = `${ORG_CHART_URL}/login`;
@@ -84,7 +97,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ user, profile, loading }}>
       {children}
     </AuthContext.Provider>
   );
