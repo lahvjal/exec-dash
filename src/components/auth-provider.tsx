@@ -83,7 +83,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           </div>
           <h1 className="text-xl font-bold text-slate-900 mb-2">Access Restricted</h1>
           <p className="text-sm text-slate-600 mb-6">
-            The KPI Dashboard is only available to executives and super admins.
+            The KPI Dashboard is only for Aveyo Executives.
           </p>
           <a
             href={ORG_CHART_URL}
