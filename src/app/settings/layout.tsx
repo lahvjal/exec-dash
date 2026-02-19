@@ -5,41 +5,43 @@ import Link from "next/link";
 import { Header } from "@/components/header";
 
 const settingsNav = [
-  { label: "Overview", href: "/settings",       exact: true  },
-  { label: "Goals",    href: "/settings/goals",  exact: false },
-  { label: "KPIs",    href: "/settings/kpis",   exact: false },
+  { label: "Goals",              href: "/settings/goals"          },
+  { label: "KPI Management",     href: "/settings/kpis"           },
+  { label: "KPI Documentation",  href: "/settings/documentation"  },
 ];
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  const isActive = (href: string, exact: boolean) =>
-    exact ? pathname === href : pathname?.startsWith(href);
+  const isActive = (href: string) => pathname?.startsWith(href);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-white">
       <Header />
 
-      {/* Settings sub-navigation — same style as main header nav links */}
-      <div className="bg-white border-b border-black sticky top-[65px] z-40">
-        <div className="flex items-center gap-1 px-5 h-11">
-          {settingsNav.map(({ label, href, exact }) => (
+      <div className="flex">
+        {/* Left sidebar */}
+        <aside className="w-52 shrink-0 sticky top-[65px] h-[calc(100vh-65px)] border-r border-black bg-white flex flex-col pt-6 px-4 gap-1">
+          <p className="px-3 mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Settings
+          </p>
+          {settingsNav.map(({ label, href }) => (
             <Link
               key={href}
               href={href}
-              className={`px-3 py-1.5 text-sm transition-colors ${
-                isActive(href, exact)
-                  ? "text-black"
+              className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                isActive(href)
+                  ? "text-black font-medium"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {label}
             </Link>
           ))}
-        </div>
-      </div>
+        </aside>
 
-      <main>{children}</main>
+        <main className="flex-1 min-w-0">{children}</main>
+      </div>
     </div>
   );
 }
