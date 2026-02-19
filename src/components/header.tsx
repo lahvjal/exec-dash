@@ -2,7 +2,6 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { LogOut } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { supabase } from "@/lib/supabase";
@@ -54,11 +53,10 @@ function UserAvatar({
 
   if (photoUrl) {
     return (
-      <Image
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
         src={photoUrl}
         alt={fullName ?? "User avatar"}
-        width={32}
-        height={32}
         className="h-8 w-8 rounded-full object-cover"
       />
     );
