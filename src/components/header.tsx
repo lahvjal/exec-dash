@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { LogOut } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { supabase } from "@/lib/supabase";
@@ -53,10 +54,11 @@ function UserAvatar({
 
   if (photoUrl) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      <Image
         src={photoUrl}
         alt={fullName ?? "User avatar"}
+        width={32}
+        height={32}
         className="h-8 w-8 rounded-full object-cover"
       />
     );
@@ -93,8 +95,8 @@ export function Header() {
   const jobTitle = profile?.job_title ?? null;
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white">
-      <div className="flex h-[52px] items-center gap-6 px-5">
+    <header className="sticky top-0 z-50 w-full border-b border-black bg-white">
+      <div className="flex h-[65px] items-center gap-6 px-5">
         {/* Aveyo mark */}
         <a
           href={ORG_CHART_URL}
@@ -109,9 +111,9 @@ export function Header() {
           {navLinks.map(({ label, href, external }) => {
             const active = !external && isActive(href);
             const baseClass =
-              "px-3 py-1.5 rounded-md text-sm transition-colors font-medium";
-            const activeClass = "text-gray-900 bg-gray-100";
-            const inactiveClass = "text-gray-500 hover:text-gray-900 hover:bg-gray-50";
+              "px-3 py-1.5 text-sm transition-colors";
+            const activeClass = "text-black";
+            const inactiveClass = "text-sm text-muted-foreground hover:text-foreground";
 
             if (external) {
               return (

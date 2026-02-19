@@ -1,14 +1,13 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Target, Database, LayoutDashboard } from "lucide-react";
 import Link from "next/link";
 import { Header } from "@/components/header";
 
 const settingsNav = [
-  { label: "Overview", href: "/settings", icon: LayoutDashboard, exact: true },
-  { label: "Goals",    href: "/settings/goals", icon: Target, exact: false },
-  { label: "KPIs",    href: "/settings/kpis",  icon: Database, exact: false },
+  { label: "Overview", href: "/settings",       exact: true  },
+  { label: "Goals",    href: "/settings/goals",  exact: false },
+  { label: "KPIs",    href: "/settings/kpis",   exact: false },
 ];
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
@@ -19,28 +18,24 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Shared navbar — same as dashboard */}
       <Header />
 
-      {/* Settings sub-navigation */}
-      <div className="bg-white border-b border-gray-200 sticky top-[52px] z-40">
-        <div className="px-5">
-          <nav className="flex items-center gap-1 h-11">
-            {settingsNav.map(({ label, href, icon: Icon, exact }) => (
-              <Link
-                key={href}
-                href={href}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  isActive(href, exact)
-                    ? "bg-gray-100 text-gray-900"
-                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {label}
-              </Link>
-            ))}
-          </nav>
+      {/* Settings sub-navigation — same style as main header nav links */}
+      <div className="bg-white border-b border-black sticky top-[65px] z-40">
+        <div className="flex items-center gap-1 px-5 h-11">
+          {settingsNav.map(({ label, href, exact }) => (
+            <Link
+              key={href}
+              href={href}
+              className={`px-3 py-1.5 text-sm transition-colors ${
+                isActive(href, exact)
+                  ? "text-black"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {label}
+            </Link>
+          ))}
         </div>
       </div>
 
