@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { supabaseCookieStorage } from './cookie-storage';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -7,8 +8,16 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables. Please add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to your .env.local file');
 }
 
-// Client for browser/client-side
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Client for browser/client-side — uses shared .aveyo.com cookie so session
+// is readable by both kpi.aveyo.com and orgchart.aveyo.com
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: supabaseCookieStorage,
+    storageKey: 'sb-aveyo-auth',
+    autoRefreshToken: true,
+    persistSession: true,
+  },
+});
 
 // Service role client for server-side admin operations
 export const getServiceRoleClient = () => {

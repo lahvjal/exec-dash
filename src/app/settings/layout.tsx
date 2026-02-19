@@ -2,21 +2,15 @@
 
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
-import { Home, Target, Database, LayoutDashboard, LogOut, Settings as SettingsIcon } from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import { useRouter } from "next/navigation";
+import { Home, Target, Database, LayoutDashboard, Settings as SettingsIcon } from "lucide-react";
 import Link from "next/link";
+
+const ORG_CHART_URL =
+  process.env.NEXT_PUBLIC_ORG_CHART_URL || "http://localhost:5173";
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const pathname = usePathname();
-  const router = useRouter();
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push("/");
-    router.refresh();
-  };
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -78,18 +72,17 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
               </nav>
             </div>
 
-            {/* User Info and Logout */}
+            {/* User Info and Org Chart link */}
             <div className="flex items-center gap-4">
               <div className="text-sm text-slate-600">
                 <span className="font-medium text-slate-900">{user?.email}</span>
               </div>
-              <button
-                onClick={handleLogout}
+              <a
+                href={ORG_CHART_URL}
                 className="flex items-center gap-2 px-4 py-2 text-sm text-slate-600 hover:text-slate-900 border border-slate-300 rounded-lg hover:border-slate-400 transition-colors"
               >
-                <LogOut className="h-4 w-4" />
-                Sign Out
-              </button>
+                ← Org Chart
+              </a>
             </div>
           </div>
         </div>
