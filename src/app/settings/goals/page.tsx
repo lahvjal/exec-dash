@@ -71,7 +71,13 @@ export default function GoalsPage() {
 
   const fetchGoals = async () => {
     try {
-      const response = await fetch("/api/goals");
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: HeadersInit = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const response = await fetch("/api/goals", { headers });
       const data = await response.json();
       
       if (data.success) {

@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, getServiceRoleClient } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 import { invalidateGoalsCache } from '@/lib/kpi-service';
 import { clearKPICache } from '@/lib/cache-utils';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 /**
  * Goals API Routes (Supabase Version)
@@ -13,7 +17,20 @@ import { clearKPICache } from '@/lib/cache-utils';
 // GET - Retrieve all goals
 export async function GET(request: NextRequest) {
   try {
-    const { data, error } = await supabase
+    const authHeader = request.headers.get('authorization');
+
+    if (!authHeader) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    const authenticatedClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const { data, error } = await authenticatedClient
       .from('goals')
       .select('*')
       .order('kpi_id', { ascending: true });
@@ -132,9 +149,11 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Upsert goals to Supabase using service role (bypasses RLS after auth check)
-    const serviceClient = getServiceRoleClient();
-    const { error: upsertError } = await serviceClient
+    // Upsert goals using the authenticated client so RLS policies apply
+    const authenticatedClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    const { error: upsertError } = await authenticatedClient
       .from('goals')
       .upsert(upsertData, {
         onConflict: 'kpi_id,period',
