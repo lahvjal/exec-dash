@@ -1,6 +1,6 @@
 import { query, queryOne } from './db';
 import { TimePeriod, KPIValue, KPITrend, KPIStatus } from '@/types/kpi';
-import { supabase } from './supabase';
+import { supabase, getServiceRoleClient } from './supabase';
 import { replaceFieldTokens, extractExpressionVariables } from './formula-validator';
 import type { CustomKPIRecord } from './supabase';
 
@@ -180,7 +180,9 @@ async function loadGoals(): Promise<any> {
   }
   
   try {
-    const { data, error } = await supabase
+    // Use service role client — this is a server-side read of goal config values,
+    // no user data involved. The auth check happens at the dashboard/page level.
+    const { data, error } = await getServiceRoleClient()
       .from('goals')
       .select('*');
     
@@ -1262,7 +1264,8 @@ export async function getRevenueReceivedCommercial(period: TimePeriod): Promise<
  */
 async function getCustomKPI(kpiId: string): Promise<CustomKPIRecord | null> {
   try {
-    const { data, error } = await supabase
+    // Use service role client — server-side lookup of KPI formula config.
+    const { data, error } = await getServiceRoleClient()
       .from('custom_kpis')
       .select('*')
       .eq('kpi_id', kpiId)
