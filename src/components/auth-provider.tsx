@@ -27,7 +27,7 @@ export const useAuth = () => useContext(AuthContext);
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -45,12 +45,12 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
       const { data: profileData } = await supabase
         .from("profiles")
-        .select("is_admin, full_name, job_title, profile_photo_url")
+        .select("is_executive, is_super_admin, full_name, job_title, profile_photo_url")
         .eq("id", user.id)
         .single();
 
       setUser(user);
-      setIsAdmin(profileData?.is_admin ?? false);
+      setIsAuthorized((profileData?.is_executive ?? false) || (profileData?.is_super_admin ?? false));
       setProfile({
         full_name: profileData?.full_name ?? null,
         job_title: profileData?.job_title ?? null,
@@ -72,7 +72,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     );
   }
 
-  if (!isAdmin) {
+  if (!isAuthorized) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-8 w-full max-w-md text-center">
@@ -83,7 +83,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           </div>
           <h1 className="text-xl font-bold text-slate-900 mb-2">Access Restricted</h1>
           <p className="text-sm text-slate-600 mb-6">
-            The KPI Dashboard is only available to admin users.
+            The KPI Dashboard is only available to executives and super admins.
           </p>
           <a
             href={ORG_CHART_URL}
