@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Header } from "@/components/header";
+import { AppShell } from "@/components/app-shell";
 import { TimeFilter } from "@/components/time-filter";
 import { KPISection } from "@/components/kpi-section";
 import { TimePeriod, type KPISection as KPISectionType } from "@/types/kpi";
@@ -87,8 +87,8 @@ export default function Dashboard() {
   }, [refetch]);
 
   return (
+    <AppShell>
     <div className="min-h-screen bg-slate-50">
-      <Header />
 
       {/* Page Header */}
       <div className="px-6 pt-6 max-w-[1600px] mx-auto">
@@ -111,7 +111,7 @@ export default function Dashboard() {
       </div>
 
       {/* Sticky Time Filter & Refresh Button */}
-      <div className="sticky top-20 z-20 px-6 pb-6 bg-transparent">
+      <div className="sticky top-[65px] z-20 px-6 pb-6 bg-transparent">
         <div className="max-w-[1600px] mx-auto flex items-center justify-center gap-4">
           <TimeFilter selected={selectedPeriod} onChange={setSelectedPeriod} />
           
@@ -178,6 +178,7 @@ export default function Dashboard() {
         </footer>
       </main>
     </div>
+    </AppShell>
   );
 }
 
