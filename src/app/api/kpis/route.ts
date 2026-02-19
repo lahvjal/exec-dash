@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, getServiceRoleClient } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { DASHBOARD_SECTIONS } from '@/types/kpi';
 import type { CustomKPIRecord } from '@/lib/supabase';
 
@@ -45,10 +45,22 @@ export async function GET(request: NextRequest) {
       }))
     );
 
-    // Fetch ALL active KPIs from Supabase (including hidden ones if authenticated)
+    // Fetch ALL active KPIs from Supabase.
+    // If the user is authenticated, use their token so RLS grants the
+    // "Authenticated can read all KPIs" policy (includes hidden KPIs).
+    // Otherwise fall back to anon client, which may return nothing if no
+    // public read policy exists — callers should always send the auth header.
     let allKPIs: CustomKPIRecord[] | null = null;
     try {
-      const { data, error } = await supabase
+      const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+      const readClient = authHeader
+        ? createSupabaseClient(supabaseUrl, supabaseAnonKey, {
+            global: { headers: { Authorization: authHeader } }
+          })
+        : supabase;
+      const { data, error } = await readClient
         .from('custom_kpis')
         .select('*')
         .eq('is_active', true)

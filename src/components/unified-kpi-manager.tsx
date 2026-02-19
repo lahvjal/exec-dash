@@ -83,16 +83,16 @@ export default function UnifiedKPIManager() {
     try {
       setLoading(true);
 
-      // Fetch sections
-      const sectionsResponse = await fetch('/api/sections');
-      const sectionsData = await sectionsResponse.json();
-
-      // Fetch KPIs with auth header
+      // Get session first so auth header can be sent to all API routes
       const { data: { session } } = await supabase.auth.getSession();
       const headers: HeadersInit = {};
       if (session?.access_token) {
         headers['Authorization'] = `Bearer ${session.access_token}`;
       }
+
+      // Fetch sections and KPIs with auth header
+      const sectionsResponse = await fetch('/api/sections', { headers });
+      const sectionsData = await sectionsResponse.json();
 
       const kpisResponse = await fetch('/api/kpis', { headers });
       const kpisData = await kpisResponse.json();

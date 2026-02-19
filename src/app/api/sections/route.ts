@@ -14,9 +14,21 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 // GET - Fetch section order
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
-    
-    const { data: sections, error } = await supabase
+    const authHeader = request.headers.get('authorization');
+
+    if (!authHeader) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    // Use the user's session token so RLS authenticated policies apply
+    const authenticatedClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const { data: sections, error } = await authenticatedClient
       .from('section_order')
       .select('*')
       .eq('is_active', true)
